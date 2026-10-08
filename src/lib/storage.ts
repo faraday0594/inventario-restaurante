@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
-import { Product, Movement, MovementType, User, UserRole } from './types';
+import { Product, Movement, MovementType, User, UserRole, MenuItem, Order, OrderItem, OrderStatus, OrderType } from './types';
 
 // En entornos serverless como Vercel o AWS Lambda, solo /tmp es escribible
 const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -13,7 +13,76 @@ export interface InventoryData {
   products: Product[];
   movements: Movement[];
   users: User[];
+  menuItems: MenuItem[];
+  orders: Order[];
 }
+
+export const INITIAL_MENU_ITEMS: MenuItem[] = [
+  {
+    id: 'dish-1',
+    name: 'Almuerzo Ejecutivo del Día',
+    category: 'Almuerzos',
+    price: 14000,
+    description: 'Sopa, principio, carne al gusto, arroz, ensalada y tajada',
+    available: true
+  },
+  {
+    id: 'dish-2',
+    name: 'Bandeja Paisa Especial',
+    category: 'Especiales',
+    price: 24000,
+    description: 'Frijoles, arroz, carne molida, chicharrón, huevo, chorizo, tajada y aguacate',
+    available: true
+  },
+  {
+    id: 'dish-3',
+    name: 'Pechuga a la Plancha c/ Papas',
+    category: 'Almuerzos',
+    price: 18000,
+    description: 'Pechuga asada con papas a la francesa, ensalada y arroz',
+    available: true
+  },
+  {
+    id: 'dish-4',
+    name: 'Carne Asada de Res c/ Patacón',
+    category: 'Almuerzos',
+    price: 19000,
+    description: 'Carne de res asada con patacón, ensalada y arroz',
+    available: true
+  },
+  {
+    id: 'dish-5',
+    name: 'Sancocho Tradicional c/ Presa',
+    category: 'Sopas',
+    price: 18000,
+    description: 'Sancocho con presa de gallina criolla o carne, arroz y aguacate',
+    available: true
+  },
+  {
+    id: 'dish-6',
+    name: 'Hamburguesa de la Casa Especial',
+    category: 'Comidas Rápidas',
+    price: 16000,
+    description: 'Carne de res 150g, queso mozzarella, tocineta y papas fritas',
+    available: true
+  },
+  {
+    id: 'dish-7',
+    name: 'Porción de Papas a la Francesa',
+    category: 'Adicionales',
+    price: 7000,
+    description: 'Papas crocantes con salsa tártara y tomate',
+    available: true
+  },
+  {
+    id: 'dish-8',
+    name: 'Porción de Patacones con Hogao',
+    category: 'Adicionales',
+    price: 8000,
+    description: 'Patacones de plátano verde con hogao tradicional',
+    available: true
+  }
+];
 
 export const INITIAL_USERS: User[] = [
   {
@@ -35,6 +104,27 @@ export const INITIAL_USERS: User[] = [
     name: 'Ana (Turno Barra)',
     role: 'EMPLEADO',
     pin: '5678',
+    active: true
+  },
+  {
+    id: 'user-mesera-1',
+    name: 'Laura (Mesera)',
+    role: 'MESERA',
+    pin: '2222',
+    active: true
+  },
+  {
+    id: 'user-mesera-2',
+    name: 'Valentina (Mesera)',
+    role: 'MESERA',
+    pin: '3333',
+    active: true
+  },
+  {
+    id: 'user-cocina',
+    name: 'Cocina Principal',
+    role: 'COCINA',
+    pin: '4444',
     active: true
   }
 ];
@@ -62,16 +152,32 @@ function getPgPool(): Pool | null {
   return pgPool;
 }
 
+function normalizeData(data: InventoryData): InventoryData {
+  if (!data.users || !Array.isArray(data.users) || data.users.length === 0) {
+    data.users = INITIAL_USERS;
+  } else {
+    for (const initU of INITIAL_USERS) {
+      if (!data.users.some(u => u.id === initU.id)) {
+        data.users.push(initU);
+      }
+    }
+  }
+  if (!data.products || !Array.isArray(data.products)) data.products = [];
+  if (!data.movements || !Array.isArray(data.movements)) data.movements = [];
+  if (!data.menuItems || !Array.isArray(data.menuItems) || data.menuItems.length === 0) {
+    data.menuItems = INITIAL_MENU_ITEMS;
+  }
+  if (!data.orders || !Array.isArray(data.orders)) data.orders = [];
+  return data;
+}
+
 function getLocalData(): InventoryData {
   // 1. Intentar leer del archivo modificable (/tmp en Vercel, o data/ en local)
   if (fs.existsSync(WRITABLE_FILE)) {
     try {
       const content = fs.readFileSync(WRITABLE_FILE, 'utf-8');
       const parsed = JSON.parse(content) as InventoryData;
-      if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
-        parsed.users = INITIAL_USERS;
-      }
-      return parsed;
+      return normalizeData(parsed);
     } catch (err) {
       console.warn('Error leyendo WRITABLE_FILE:', err);
     }
@@ -82,20 +188,19 @@ function getLocalData(): InventoryData {
     try {
       const content = fs.readFileSync(BUNDLED_FILE, 'utf-8');
       const parsed = JSON.parse(content) as InventoryData;
-      if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
-        parsed.users = INITIAL_USERS;
-      }
-      return parsed;
+      return normalizeData(parsed);
     } catch (err) {
       console.warn('Error leyendo BUNDLED_FILE:', err);
     }
   }
 
-  return {
+  return normalizeData({
     products: [],
     movements: [],
-    users: INITIAL_USERS
-  };
+    users: INITIAL_USERS,
+    menuItems: INITIAL_MENU_ITEMS,
+    orders: []
+  });
 }
 
 function saveLocalData(data: InventoryData) {
@@ -123,10 +228,7 @@ async function ensureData(): Promise<InventoryData> {
       const res = await pool.query(`SELECT data FROM inventory_data WHERE id = 'main' LIMIT 1;`);
       if (res.rows.length > 0) {
         const cloudData = res.rows[0].data as InventoryData;
-        if (!cloudData.users || cloudData.users.length === 0) {
-          cloudData.users = INITIAL_USERS;
-        }
-        return cloudData;
+        return normalizeData(cloudData);
       }
 
       // Si la tabla en la nube está vacía, sembrar con los datos actuales
@@ -412,4 +514,288 @@ export function matchProduct(rawName: string, products: Product[]): { product: P
   }
 
   return { product: null, confidence: 0 };
+}
+
+// ==========================================
+// MENÚ DE PLATILLOS (COCINA)
+// ==========================================
+
+export async function getAllMenuItems(): Promise<MenuItem[]> {
+  const data = await ensureData();
+  return data.menuItems || INITIAL_MENU_ITEMS;
+}
+
+export async function saveMenuItem(
+  item: Omit<MenuItem, 'id'> & { id?: string }
+): Promise<MenuItem> {
+  const data = await ensureData();
+  if (item.id) {
+    const idx = data.menuItems.findIndex(m => m.id === item.id);
+    if (idx !== -1) {
+      data.menuItems[idx] = { ...data.menuItems[idx], ...item };
+      await saveData(data);
+      return data.menuItems[idx];
+    }
+  }
+  const newItem: MenuItem = {
+    ...item,
+    id: `dish-${Date.now()}`,
+    available: item.available !== false
+  };
+  data.menuItems.push(newItem);
+  await saveData(data);
+  return newItem;
+}
+
+export async function deleteMenuItem(id: string): Promise<boolean> {
+  const data = await ensureData();
+  const initialLen = data.menuItems.length;
+  data.menuItems = data.menuItems.filter(m => m.id !== id);
+  if (data.menuItems.length !== initialLen) {
+    await saveData(data);
+    return true;
+  }
+  return false;
+}
+
+// ==========================================
+// COMANDAS Y PEDIDOS (MESERAS & COCINA)
+// ==========================================
+
+export async function getAllOrders(filter?: {
+  date?: string; // YYYY-MM-DD
+  status?: OrderStatus;
+  activeOnly?: boolean; // PENDIENTE, EN_PREPARACION, LISTO
+  waiterId?: string;
+}): Promise<Order[]> {
+  const data = await ensureData();
+  let orders = data.orders || [];
+
+  if (filter?.activeOnly) {
+    orders = orders.filter(o => o.status === 'PENDIENTE' || o.status === 'EN_PREPARACION' || o.status === 'LISTO');
+  }
+
+  if (filter?.status) {
+    orders = orders.filter(o => o.status === filter.status);
+  }
+
+  if (filter?.waiterId) {
+    orders = orders.filter(o => o.waiterId === filter.waiterId);
+  }
+
+  if (filter?.date) {
+    orders = orders.filter(o => o.createdAt.startsWith(filter.date!));
+  }
+
+  return orders;
+}
+
+export async function createOrder(
+  orderInput: {
+    type: OrderType;
+    tableNumber?: string;
+    customerName?: string;
+    items: Array<{
+      itemType: 'DISH' | 'PRODUCT';
+      itemId: string;
+      name: string;
+      category: string;
+      quantity: number;
+      unitPrice: number;
+      notes?: string;
+    }>;
+    notes?: string;
+  },
+  waiter: { id: string; name: string }
+): Promise<Order> {
+  const data = await ensureData();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const todayStr = nowIso.slice(0, 10); // YYYY-MM-DD
+
+  // Consecutivo diario: número de pedidos de hoy + 1
+  const todayOrders = (data.orders || []).filter(o => o.createdAt.startsWith(todayStr));
+  const orderNumber = todayOrders.length + 1;
+
+  let subtotal = 0;
+  const processedItems: OrderItem[] = orderInput.items.map((it, idx) => {
+    const total = it.quantity * it.unitPrice;
+    subtotal += total;
+    return {
+      id: `item-${Date.now()}-${idx}`,
+      itemType: it.itemType,
+      itemId: it.itemId,
+      name: it.name,
+      category: it.category,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      totalPrice: total,
+      notes: it.notes?.trim() || undefined
+    };
+  });
+
+  const newOrder: Order = {
+    id: `ord-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    orderNumber,
+    type: orderInput.type,
+    tableNumber: orderInput.type === 'MESA' ? (orderInput.tableNumber || 'Mesa 1') : undefined,
+    customerName: orderInput.customerName?.trim() || undefined,
+    items: processedItems,
+    status: 'PENDIENTE',
+    subtotal,
+    total: subtotal,
+    notes: orderInput.notes?.trim() || undefined,
+    waiterId: waiter.id,
+    waiterName: waiter.name,
+    createdAt: nowIso,
+    updatedAt: nowIso
+  };
+
+  // Descuento automático de inventario para bebidas / productos
+  for (const item of processedItems) {
+    if (item.itemType === 'PRODUCT') {
+      const prod = data.products.find(p => p.id === item.itemId);
+      if (prod) {
+        const prevStock = prod.stock;
+        const newStock = Math.max(0, prevStock - item.quantity);
+        prod.stock = newStock;
+        prod.updatedAt = nowIso;
+
+        // Registrar movimiento de SALIDA
+        const mov: Movement = {
+          id: `mov-sale-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          productId: prod.id,
+          productName: prod.name,
+          type: 'SALIDA',
+          quantity: item.quantity,
+          previousStock: prevStock,
+          newStock: newStock,
+          reason: `Venta Comanda #${orderNumber} (${newOrder.tableNumber || 'Para llevar'}) - Mesera: ${waiter.name}`,
+          userId: waiter.id,
+          userName: waiter.name,
+          userRole: 'MESERA',
+          createdAt: nowIso
+        };
+        data.movements.unshift(mov);
+      }
+    }
+  }
+
+  data.orders.push(newOrder);
+  await saveData(data);
+  return newOrder;
+}
+
+export async function updateOrderStatus(
+  orderId: string,
+  newStatus: OrderStatus,
+  user?: { id: string; name: string }
+): Promise<Order> {
+  const data = await ensureData();
+  const order = data.orders.find(o => o.id === orderId);
+  if (!order) {
+    throw new Error('Comanda o pedido no encontrado');
+  }
+
+  const nowIso = new Date().toISOString();
+  order.status = newStatus;
+  order.updatedAt = nowIso;
+
+  if (newStatus === 'EN_PREPARACION' && !order.preparedAt) {
+    order.preparedAt = nowIso;
+  } else if ((newStatus === 'LISTO' || newStatus === 'ENTREGADO') && !order.deliveredAt) {
+    order.deliveredAt = nowIso;
+  }
+
+  // Si se cancela una orden, revertir stock de productos que se habían descontado
+  if (newStatus === 'CANCELADO') {
+    for (const item of order.items) {
+      if (item.itemType === 'PRODUCT') {
+        const prod = data.products.find(p => p.id === item.itemId);
+        if (prod) {
+          const prevStock = prod.stock;
+          const restoredStock = prevStock + item.quantity;
+          prod.stock = restoredStock;
+          prod.updatedAt = nowIso;
+
+          const mov: Movement = {
+            id: `mov-rev-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+            productId: prod.id,
+            productName: prod.name,
+            type: 'ENTRADA',
+            quantity: item.quantity,
+            previousStock: prevStock,
+            newStock: restoredStock,
+            reason: `Reversión por cancelación de Comanda #${order.orderNumber}`,
+            userId: user?.id,
+            userName: user?.name,
+            createdAt: nowIso
+          };
+          data.movements.unshift(mov);
+        }
+      }
+    }
+  }
+
+  await saveData(data);
+  return order;
+}
+
+export async function getDailyOrdersSummary(dateStr?: string): Promise<{
+  date: string;
+  totalOrders: number;
+  pendingOrders: number;
+  preparingOrders: number;
+  readyOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
+  totalRevenue: number;
+  waiterStats: Array<{ waiterName: string; orderCount: number; totalSales: number }>;
+}> {
+  const data = await ensureData();
+  const targetDate = dateStr || new Date().toISOString().slice(0, 10);
+  const dayOrders = (data.orders || []).filter(o => o.createdAt.startsWith(targetDate));
+
+  let totalRevenue = 0;
+  let pendingOrders = 0;
+  let preparingOrders = 0;
+  let readyOrders = 0;
+  let deliveredOrders = 0;
+  let cancelledOrders = 0;
+
+  const waiterMap: { [name: string]: { count: number; sales: number } } = {};
+
+  for (const o of dayOrders) {
+    if (o.status === 'PENDIENTE') pendingOrders++;
+    else if (o.status === 'EN_PREPARACION') preparingOrders++;
+    else if (o.status === 'LISTO') readyOrders++;
+    else if (o.status === 'ENTREGADO') deliveredOrders++;
+    else if (o.status === 'CANCELADO') cancelledOrders++;
+
+    if (o.status !== 'CANCELADO') {
+      totalRevenue += o.total;
+      const wName = o.waiterName || 'Mesera General';
+      if (!waiterMap[wName]) waiterMap[wName] = { count: 0, sales: 0 };
+      waiterMap[wName].count++;
+      waiterMap[wName].sales += o.total;
+    }
+  }
+
+  const waiterStats = Object.entries(waiterMap).map(([waiterName, st]) => ({
+    waiterName,
+    orderCount: st.count,
+    totalSales: st.sales
+  }));
+
+  return {
+    date: targetDate,
+    totalOrders: dayOrders.length,
+    pendingOrders,
+    preparingOrders,
+    readyOrders,
+    deliveredOrders,
+    cancelledOrders,
+    totalRevenue,
+    waiterStats
+  };
 }

@@ -159,8 +159,22 @@ export function LoginModal({
                       </div>
                       <div>
                         <span className="text-xs font-black text-slate-900 block">{u.name}</span>
-                        <span className={`text-[10px] font-bold ${isAdmin ? 'text-amber-700' : 'text-slate-500'}`}>
-                          {isAdmin ? '👑 Administrador (Acceso Total)' : '👤 Empleado (Ingreso de Facturas)'}
+                        <span className={`text-[10px] font-bold ${
+                          isAdmin 
+                            ? 'text-amber-700' 
+                            : u.role === 'MESERA'
+                            ? 'text-purple-600'
+                            : u.role === 'COCINA'
+                            ? 'text-orange-600'
+                            : 'text-slate-500'
+                        }`}>
+                          {isAdmin 
+                            ? '👑 Administrador (Acceso Total)' 
+                            : u.role === 'MESERA'
+                            ? '🍽️ Mesera (Tomar Comandas)'
+                            : u.role === 'COCINA'
+                            ? '🍳 Cocina (Pantalla de Pedidos)'
+                            : '📦 Bodega & Facturas'}
                         </span>
                       </div>
                     </div>
