@@ -1,0 +1,381 @@
+{
+  "products": [
+    {
+      "id": "prod-1",
+      "name": "Coca-Cola Original 400ml",
+      "category": "Gaseosas",
+      "presentation": "Botella PET 400ml",
+      "stock": 36,
+      "minStock": 12,
+      "costPrice": 2228,
+      "salePrice": 5000,
+      "barcode": "7702090014238",
+      "aliases": [
+        "COCA COLA 400ML",
+        "COCA-COLA PET 400",
+        "CC 400ML",
+        "COCA-COLA 400ML. PET# (12)"
+      ],
+      "updatedAt": "2026-10-08T20:22:30.189Z"
+    },
+    {
+      "id": "prod-coca-15l",
+      "name": "Coca-Cola Original 1.5L",
+      "category": "Gaseosas",
+      "presentation": "Botella PET 1.5L",
+      "stock": 12,
+      "minStock": 6,
+      "costPrice": 4792,
+      "salePrice": 8000,
+      "barcode": "7702090014252",
+      "aliases": [
+        "COCA COLA 1.5LT",
+        "COCA COLA 1.5LT. PET(12) Nvo"
+      ],
+      "updatedAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "prod-coca-350-vidrio",
+      "name": "Coca-Cola Original 350ml Retornable",
+      "category": "Gaseosas",
+      "presentation": "Botella Vidrio 350ml",
+      "stock": 30,
+      "minStock": 15,
+      "costPrice": 1845,
+      "salePrice": 3500,
+      "barcode": "7702090014269",
+      "aliases": [
+        "COCA-COLA 350ML. Vlr(30)",
+        "COCA COLA 350ML VIDRIO",
+        "CC 350ML RET"
+      ],
+      "updatedAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "prod-quatro-350-vidrio",
+      "name": "Quatro Toronja 350ml Retornable",
+      "category": "Gaseosas",
+      "presentation": "Botella Vidrio 350ml",
+      "stock": 30,
+      "minStock": 15,
+      "costPrice": 1667,
+      "salePrice": 3500,
+      "barcode": "7702090014276",
+      "aliases": [
+        "QUATRO CHOICE 350ML",
+        "QUATRO CHOICE 350ML. Vlr(30)",
+        "QUATRO 350ML VIDRIO"
+      ],
+      "updatedAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "prod-brisa-gas-600",
+      "name": "Agua Brisa Con Gas 600ml",
+      "category": "Aguas",
+      "presentation": "Botella PET 600ml",
+      "stock": 48,
+      "minStock": 12,
+      "costPrice": 1417,
+      "salePrice": 3000,
+      "barcode": "7702090014283",
+      "aliases": [
+        "AGUA BRISA GAS PET 600ML. (24)",
+        "BRISA GAS 600ML",
+        "AGUA BRISA CON GAS"
+      ],
+      "updatedAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "prod-chao-fresa",
+      "name": "Chao Fresa 350g (Kit 24)",
+      "category": "Snacks y Golosinas",
+      "presentation": "Paquete 350g",
+      "stock": 2,
+      "minStock": 2,
+      "costPrice": 7800,
+      "salePrice": 12000,
+      "barcode": "7702090014290",
+      "aliases": [
+        "CHAO FRESA 350GR KIT24(1)"
+      ],
+      "updatedAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "prod-2",
+      "name": "Coca-Cola Zero",
+      "category": "Gaseosas",
+      "presentation": "Botella PET 400ml",
+      "stock": 15,
+      "minStock": 10,
+      "costPrice": 2800,
+      "salePrice": 5000,
+      "barcode": "7702090014245",
+      "aliases": [
+        "COCA COLA ZERO 400",
+        "CC ZERO 400ML"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    },
+    {
+      "id": "prod-3",
+      "name": "Postobón Manzana",
+      "category": "Gaseosas",
+      "presentation": "Botella Vidrio 350ml",
+      "stock": 6,
+      "minStock": 12,
+      "costPrice": 2200,
+      "salePrice": 4000,
+      "barcode": "7702535002011",
+      "aliases": [
+        "POSTOBON MANZ 350 RET",
+        "POSTOBON MANZANA 350",
+        "MANZANA POSTOBON"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    },
+    {
+      "id": "prod-4",
+      "name": "Postobón Colombiana",
+      "category": "Gaseosas",
+      "presentation": "Botella Vidrio 350ml",
+      "stock": 18,
+      "minStock": 12,
+      "costPrice": 2200,
+      "salePrice": 4000,
+      "barcode": "7702535002028",
+      "aliases": [
+        "COLOMBIANA 350 RET",
+        "POSTOBON COLOMBIANA 350"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    },
+    {
+      "id": "prod-5",
+      "name": "Agua Cristal Sin Gas",
+      "category": "Aguas",
+      "presentation": "Botella PET 600ml",
+      "stock": 30,
+      "minStock": 15,
+      "costPrice": 1500,
+      "salePrice": 3500,
+      "barcode": "7702535001014",
+      "aliases": [
+        "AGUA CRISTAL S/G 600",
+        "CRISTAL PET 600ML",
+        "AGUA CRISTAL 600ML"
+      ],
+      "updatedAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "prod-6",
+      "name": "Agua Cristal Con Gas",
+      "category": "Aguas",
+      "presentation": "Botella PET 600ml",
+      "stock": 8,
+      "minStock": 10,
+      "costPrice": 1600,
+      "salePrice": 3500,
+      "barcode": "7702535001021",
+      "aliases": [
+        "AGUA CRISTAL C/G 600",
+        "CRISTAL GAS 600ML"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    },
+    {
+      "id": "prod-7",
+      "name": "Cerveza Corona Extra",
+      "category": "Cervezas",
+      "presentation": "Botella Vidrio 355ml",
+      "stock": 4,
+      "minStock": 12,
+      "costPrice": 5200,
+      "salePrice": 9000,
+      "barcode": "7501064191319",
+      "aliases": [
+        "CERVEZA CORONA 355ML",
+        "CORONA EXTRA BOTELLA",
+        "CORONA 355"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    },
+    {
+      "id": "prod-8",
+      "name": "Cerveza Club Colombia Dorada",
+      "category": "Cervezas",
+      "presentation": "Lata 330ml",
+      "stock": 22,
+      "minStock": 12,
+      "costPrice": 3200,
+      "salePrice": 6500,
+      "barcode": "7702090015013",
+      "aliases": [
+        "CLUB COLOMBIA DORADA LATA",
+        "CLUB COLOMBIA 330"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    },
+    {
+      "id": "prod-9",
+      "name": "Té Hatsu Blanco",
+      "category": "Té y Jugos",
+      "presentation": "Botella Vidrio 400ml",
+      "stock": 11,
+      "minStock": 8,
+      "costPrice": 4800,
+      "salePrice": 8500,
+      "barcode": "7707325610014",
+      "aliases": [
+        "HATSU BLANCO 400ML",
+        "TE HATSU BLANCO"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    },
+    {
+      "id": "prod-10",
+      "name": "Red Bull Energy Drink",
+      "category": "Energizantes",
+      "presentation": "Lata 250ml",
+      "stock": 9,
+      "minStock": 6,
+      "costPrice": 6500,
+      "salePrice": 12000,
+      "barcode": "9002490100070",
+      "aliases": [
+        "RED BULL 250ML",
+        "RED BULL LATA"
+      ],
+      "updatedAt": "2026-10-08T18:25:22.115Z"
+    }
+  ],
+  "movements": [
+    {
+      "id": "mov-1791490950189-dshs7",
+      "productId": "prod-1",
+      "productName": "Coca-Cola Original 400ml",
+      "type": "AJUSTE",
+      "quantity": 1,
+      "previousStock": 37,
+      "newStock": 36,
+      "reason": "Reversar test",
+      "userId": "user-admin",
+      "userName": "Administrador / Due�o",
+      "userRole": "ADMIN",
+      "createdAt": "2026-10-08T20:22:30.189Z"
+    },
+    {
+      "id": "mov-1791490901975-95jgi",
+      "productId": "prod-1",
+      "productName": "Coca-Cola Original 400ml",
+      "type": "ENTRADA",
+      "quantity": 1,
+      "previousStock": 36,
+      "newStock": 37,
+      "reason": "Ajuste de prueba admin",
+      "userId": "user-admin",
+      "userName": "Administrador / Due�o",
+      "userRole": "ADMIN",
+      "createdAt": "2026-10-08T20:21:41.975Z"
+    },
+    {
+      "id": "mov-coca-400",
+      "productId": "prod-1",
+      "productName": "Coca-Cola Original 400ml",
+      "type": "ENTRADA",
+      "quantity": 12,
+      "previousStock": 24,
+      "newStock": 36,
+      "reason": "Soporte de Entrega #00001 (Coca-Cola FEMSA) - Pos 6",
+      "createdAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "mov-coca-15l",
+      "productId": "prod-coca-15l",
+      "productName": "Coca-Cola Original 1.5L",
+      "type": "ENTRADA",
+      "quantity": 12,
+      "previousStock": 0,
+      "newStock": 12,
+      "reason": "Soporte de Entrega #00001 (Coca-Cola FEMSA) - Pos 2",
+      "createdAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "mov-coca-350",
+      "productId": "prod-coca-350-vidrio",
+      "productName": "Coca-Cola Original 350ml Retornable",
+      "type": "ENTRADA",
+      "quantity": 30,
+      "previousStock": 0,
+      "newStock": 30,
+      "reason": "Soporte de Entrega #00001 (Coca-Cola FEMSA) - Pos 5",
+      "createdAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "mov-quatro",
+      "productId": "prod-quatro-350-vidrio",
+      "productName": "Quatro Toronja 350ml Retornable",
+      "type": "ENTRADA",
+      "quantity": 30,
+      "previousStock": 0,
+      "newStock": 30,
+      "reason": "Soporte de Entrega #00001 (Coca-Cola FEMSA) - Pos 1",
+      "createdAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "mov-brisa",
+      "productId": "prod-brisa-gas-600",
+      "productName": "Agua Brisa Con Gas 600ml",
+      "type": "ENTRADA",
+      "quantity": 48,
+      "previousStock": 0,
+      "newStock": 48,
+      "reason": "Soporte de Entrega #00001 (Coca-Cola FEMSA) - Pos 4",
+      "createdAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "mov-chao",
+      "productId": "prod-chao-fresa",
+      "productName": "Chao Fresa 350g (Kit 24)",
+      "type": "ENTRADA",
+      "quantity": 2,
+      "previousStock": 0,
+      "newStock": 2,
+      "reason": "Soporte de Entrega #00001 (Coca-Cola FEMSA) - Pos 3",
+      "createdAt": "2026-10-08T19:55:00.000Z"
+    },
+    {
+      "id": "mov-init-1",
+      "productId": "prod-1",
+      "productName": "Coca-Cola Original 400ml",
+      "type": "ENTRADA",
+      "quantity": 24,
+      "previousStock": 0,
+      "newStock": 24,
+      "reason": "Inventario inicial de apertura",
+      "createdAt": "2026-10-08T18:25:22.122Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "user-admin",
+      "name": "Administrador / Dueño",
+      "role": "ADMIN",
+      "pin": "9999",
+      "active": true
+    },
+    {
+      "id": "user-emp-1",
+      "name": "Carlos (Bodega)",
+      "role": "EMPLEADO",
+      "pin": "1234",
+      "active": true
+    },
+    {
+      "id": "user-emp-2",
+      "name": "Ana (Turno Barra)",
+      "role": "EMPLEADO",
+      "pin": "5678",
+      "active": true
+    }
+  ]
+}
