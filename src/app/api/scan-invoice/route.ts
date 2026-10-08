@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
     // Llamar a MiniMax Vision
     const scanResult = await parseInvoiceWithMiniMax(image);
-    const existingProducts = getAllProducts();
+    const existingProducts = await getAllProducts();
 
     // Enlazar cada ítem extraído con los productos existentes
     const enrichedItems = scanResult.items.map(item => {

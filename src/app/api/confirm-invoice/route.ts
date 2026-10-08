@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
       // Si se crea un producto nuevo a partir de la factura
       if (item.createNew && item.newProductDetails) {
-        const created = saveProduct({
+        const created = await saveProduct({
           name: item.newProductDetails.name,
           category: item.newProductDetails.category || 'Gaseosas',
           presentation: item.newProductDetails.presentation || 'Unidad',
@@ -60,9 +60,9 @@ export async function POST(request: Request) {
 
       if (targetId) {
         // Asegurar que el alias del producto guarde el nombre de la factura para la próxima vez
-        const existing = getProductById(targetId);
+        const existing = await getProductById(targetId);
         if (existing && !existing.aliases.includes(item.rawName)) {
-          saveProduct({
+          await saveProduct({
             ...existing,
             aliases: [...existing.aliases, item.rawName],
             costPrice: item.unitPrice && item.unitPrice > 0 ? item.unitPrice : existing.costPrice
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         }
 
         // Sumar al stock registrando el usuario operador
-        const result = updateProductStock(targetId, item.quantity, 'ENTRADA', reason, user);
+        const result = await updateProductStock(targetId, item.quantity, 'ENTRADA', reason, user);
         processed.push(result);
       }
     }

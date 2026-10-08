@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { Pool } from 'pg';
 import { Product, Movement, MovementType, User, UserRole } from './types';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -35,52 +36,116 @@ export const INITIAL_USERS: User[] = [
   }
 ];
 
-function ensureDataFile(): InventoryData {
+let pgPool: Pool | null = null;
+
+function getPgPool(): Pool | null {
+  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!dbUrl) return null;
+  if (!pgPool) {
+    pgPool = new Pool({
+      connectionString: dbUrl,
+      ssl: { rejectUnauthorized: false }
+    });
+  }
+  return pgPool;
+}
+
+function getLocalData(): InventoryData {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  if (!fs.existsSync(DATA_FILE)) {
-    const initialData: InventoryData = {
-      products: [],
-      movements: [],
-      users: INITIAL_USERS
-    };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
-    return initialData;
+  if (fs.existsSync(DATA_FILE)) {
+    try {
+      const content = fs.readFileSync(DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(content) as InventoryData;
+      if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
+        parsed.users = INITIAL_USERS;
+      }
+      return parsed;
+    } catch {
+      // continuar a inicial
+    }
   }
 
-  try {
-    const content = fs.readFileSync(DATA_FILE, 'utf-8');
-    const parsed = JSON.parse(content) as InventoryData;
-    if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
-      parsed.users = INITIAL_USERS;
-      fs.writeFileSync(DATA_FILE, JSON.stringify(parsed, null, 2), 'utf-8');
-    }
-    return parsed;
-  } catch {
-    return { products: [], movements: [], users: INITIAL_USERS };
-  }
+  return {
+    products: [],
+    movements: [],
+    users: INITIAL_USERS
+  };
 }
 
-function saveData(data: InventoryData) {
+function saveLocalData(data: InventoryData) {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+async function ensureData(): Promise<InventoryData> {
+  const pool = getPgPool();
+  if (pool) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS inventory_data (
+          id VARCHAR(50) PRIMARY KEY,
+          data JSONB NOT NULL,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      const res = await pool.query(`SELECT data FROM inventory_data WHERE id = 'main' LIMIT 1;`);
+      if (res.rows.length > 0) {
+        const cloudData = res.rows[0].data as InventoryData;
+        if (!cloudData.users || cloudData.users.length === 0) {
+          cloudData.users = INITIAL_USERS;
+        }
+        return cloudData;
+      }
+
+      // Si la tabla en la nube está vacía, sembrar con los datos actuales
+      const localData = getLocalData();
+      await pool.query(
+        `INSERT INTO inventory_data (id, data) VALUES ('main', $1) ON CONFLICT (id) DO NOTHING;`,
+        [JSON.stringify(localData)]
+      );
+      return localData;
+    } catch (err) {
+      console.error('Error conectando a PostgreSQL en la nube, usando almacenamiento local:', err);
+    }
+  }
+
+  return getLocalData();
+}
+
+async function saveData(data: InventoryData): Promise<void> {
+  const pool = getPgPool();
+  if (pool) {
+    try {
+      await pool.query(`
+        INSERT INTO inventory_data (id, data, updated_at)
+        VALUES ('main', $1, NOW())
+        ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW();
+      `, [JSON.stringify(data)]);
+      return;
+    } catch (err) {
+      console.error('Error guardando en PostgreSQL:', err);
+    }
+  }
+
+  saveLocalData(data);
+}
+
 // ==========================================
 // USUARIOS Y AUTENTICACIÓN
 // ==========================================
 
-export function getAllUsers(): Omit<User, 'pin'>[] {
-  const data = ensureDataFile();
+export async function getAllUsers(): Promise<Omit<User, 'pin'>[]> {
+  const data = await ensureData();
   return (data.users || INITIAL_USERS).map(({ pin, ...rest }) => rest);
 }
 
-export function authenticateUser(userId: string, pin: string): Omit<User, 'pin'> | null {
-  const data = ensureDataFile();
+export async function authenticateUser(userId: string, pin: string): Promise<Omit<User, 'pin'> | null> {
+  const data = await ensureData();
   const users = data.users || INITIAL_USERS;
   const user = users.find(u => u.id === userId && u.active);
   if (user && user.pin === pin) {
@@ -94,21 +159,21 @@ export function authenticateUser(userId: string, pin: string): Omit<User, 'pin'>
 // PRODUCTOS
 // ==========================================
 
-export function getAllProducts(): Product[] {
-  const data = ensureDataFile();
+export async function getAllProducts(): Promise<Product[]> {
+  const data = await ensureData();
   return data.products;
 }
 
-export function getProductById(id: string): Product | undefined {
-  const products = getAllProducts();
+export async function getProductById(id: string): Promise<Product | undefined> {
+  const products = await getAllProducts();
   return products.find(p => p.id === id);
 }
 
-export function saveProduct(
+export async function saveProduct(
   productData: Omit<Product, 'id' | 'updatedAt'> & { id?: string },
   user?: { id: string; name: string; role: UserRole }
-): Product {
-  const data = ensureDataFile();
+): Promise<Product> {
+  const data = await ensureData();
   const now = new Date().toISOString();
 
   // Si se está editando un producto existente
@@ -135,12 +200,12 @@ export function saveProduct(
         updatedAt: now
       };
       data.products[index] = updated;
-      saveData(data);
+      await saveData(data);
       return updated;
     }
   }
 
-  // Si es un producto NUEVO (tanto Admin como Empleado pueden crear referencias nuevas)
+  // Si es un producto NUEVO
   const newProduct: Product = {
     ...productData,
     id: `prod-${Date.now()}`,
@@ -149,7 +214,6 @@ export function saveProduct(
   };
   data.products.push(newProduct);
 
-  // Registrar auditoría de creación de nuevo producto
   if (user) {
     const creationMovement: Movement = {
       id: `mov-new-${Date.now()}`,
@@ -168,27 +232,24 @@ export function saveProduct(
     data.movements.unshift(creationMovement);
   }
 
-  saveData(data);
+  await saveData(data);
   return newProduct;
 }
 
-export function updateProductStock(
+export async function updateProductStock(
   productId: string,
   delta: number,
   type: MovementType,
   reason: string,
   user?: { id: string; name: string; role: UserRole }
-): { product: Product; movement: Movement } {
-  // REGLA DE SEGURIDAD:
-  // Si es ajuste manual directo o reducción (salida/merma/ajuste) sin factura, SOLO ADMIN puede hacerlo
+): Promise<{ product: Product; movement: Movement }> {
   if (user && user.role !== 'ADMIN') {
-    // Los empleados solo pueden sumar stock mediante factura (ENTRADA con factura)
     if (delta <= 0 || type !== 'ENTRADA') {
       throw new Error('Permiso denegado: Solo el Administrador puede restar o modificar manualmente números de stock.');
     }
   }
 
-  const data = ensureDataFile();
+  const data = await ensureData();
   const product = data.products.find(p => p.id === productId);
 
   if (!product) {
@@ -220,32 +281,31 @@ export function updateProductStock(
     data.movements = data.movements.slice(0, 500);
   }
 
-  saveData(data);
+  await saveData(data);
   return { product, movement };
 }
 
-export function deleteProduct(productId: string, user?: { role: UserRole }): boolean {
+export async function deleteProduct(productId: string, user?: { role: UserRole }): Promise<boolean> {
   if (user && user.role !== 'ADMIN') {
     throw new Error('Permiso denegado: Solo el Administrador puede eliminar productos del stock.');
   }
 
-  const data = ensureDataFile();
+  const data = await ensureData();
   const initialLength = data.products.length;
   data.products = data.products.filter(p => p.id !== productId);
   if (data.products.length !== initialLength) {
-    saveData(data);
+    await saveData(data);
     return true;
   }
   return false;
 }
 
-export function getAllMovements(limit = 100, user?: { role: UserRole }): Movement[] {
-  // REGLA: "pero eso solo lo veria admin"
+export async function getAllMovements(limit = 100, user?: { role: UserRole }): Promise<Movement[]> {
   if (user && user.role !== 'ADMIN') {
     throw new Error('Acceso restringido: Solo el Administrador puede consultar el historial de auditoría.');
   }
 
-  const data = ensureDataFile();
+  const data = await ensureData();
   return data.movements.slice(0, limit);
 }
 

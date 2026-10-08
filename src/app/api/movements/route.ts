@@ -6,7 +6,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userRole = searchParams.get('userRole');
 
-    // SEGURIDAD: Solo ADMIN puede ver el historial de auditoría
     if (userRole !== 'ADMIN') {
       return NextResponse.json(
         { success: false, error: 'Acceso restringido: Solo el Administrador puede ver el historial de auditoría.' },
@@ -14,7 +13,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const movements = getAllMovements(200, { role: 'ADMIN' });
+    const movements = await getAllMovements(200, { role: 'ADMIN' });
     return NextResponse.json({ success: true, movements });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
