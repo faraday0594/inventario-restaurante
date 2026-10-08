@@ -3,8 +3,11 @@ import path from 'path';
 import { Pool } from 'pg';
 import { Product, Movement, MovementType, User, UserRole } from './types';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DATA_FILE = path.join(DATA_DIR, 'inventory.json');
+// En entornos serverless como Vercel o AWS Lambda, solo /tmp es escribible
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const BUNDLED_FILE = path.join(process.cwd(), 'data', 'inventory.json');
+const WRITABLE_DIR = IS_SERVERLESS ? '/tmp' : path.join(process.cwd(), 'data');
+const WRITABLE_FILE = path.join(WRITABLE_DIR, 'inventory.json');
 
 export interface InventoryData {
   products: Product[];
@@ -39,8 +42,13 @@ export const INITIAL_USERS: User[] = [
 let pgPool: Pool | null = null;
 
 function getPgPool(): Pool | null {
-  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const dbUrl = 
+    process.env.POSTGRES_URL || 
+    process.env.DATABASE_URL || 
+    process.env.POSTGRES_URL_NON_POOLING;
+
   if (!dbUrl) return null;
+
   if (!pgPool) {
     pgPool = new Pool({
       connectionString: dbUrl,
@@ -51,20 +59,31 @@ function getPgPool(): Pool | null {
 }
 
 function getLocalData(): InventoryData {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  if (fs.existsSync(DATA_FILE)) {
+  // 1. Intentar leer del archivo modificable (/tmp en Vercel, o data/ en local)
+  if (fs.existsSync(WRITABLE_FILE)) {
     try {
-      const content = fs.readFileSync(DATA_FILE, 'utf-8');
+      const content = fs.readFileSync(WRITABLE_FILE, 'utf-8');
       const parsed = JSON.parse(content) as InventoryData;
       if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
         parsed.users = INITIAL_USERS;
       }
       return parsed;
-    } catch {
-      // continuar a inicial
+    } catch (err) {
+      console.warn('Error leyendo WRITABLE_FILE:', err);
+    }
+  }
+
+  // 2. Si no existe en /tmp, leer la copia empaquetada de solo lectura del proyecto
+  if (fs.existsSync(BUNDLED_FILE)) {
+    try {
+      const content = fs.readFileSync(BUNDLED_FILE, 'utf-8');
+      const parsed = JSON.parse(content) as InventoryData;
+      if (!parsed.users || !Array.isArray(parsed.users) || parsed.users.length === 0) {
+        parsed.users = INITIAL_USERS;
+      }
+      return parsed;
+    } catch (err) {
+      console.warn('Error leyendo BUNDLED_FILE:', err);
     }
   }
 
@@ -76,10 +95,14 @@ function getLocalData(): InventoryData {
 }
 
 function saveLocalData(data: InventoryData) {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(WRITABLE_DIR)) {
+      fs.mkdirSync(WRITABLE_DIR, { recursive: true });
+    }
+    fs.writeFileSync(WRITABLE_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error escribiendo en WRITABLE_FILE:', err);
   }
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
 async function ensureData(): Promise<InventoryData> {
@@ -110,7 +133,7 @@ async function ensureData(): Promise<InventoryData> {
       );
       return localData;
     } catch (err) {
-      console.error('Error conectando a PostgreSQL en la nube, usando almacenamiento local:', err);
+      console.error('Error conectando a PostgreSQL en la nube, usando almacenamiento seguro temporal:', err);
     }
   }
 
@@ -132,6 +155,7 @@ async function saveData(data: InventoryData): Promise<void> {
     }
   }
 
+  // En Vercel sin DB, guarda en /tmp sin arrojar EROFS
   saveLocalData(data);
 }
 
@@ -176,13 +200,11 @@ export async function saveProduct(
   const data = await ensureData();
   const now = new Date().toISOString();
 
-  // Si se está editando un producto existente
   if (productData.id) {
     const index = data.products.findIndex(p => p.id === productData.id);
     if (index !== -1) {
       const existing = data.products[index];
 
-      // REGLA DE SEGURIDAD: Solo ADMIN puede modificar directamente el número de stock manual
       let targetStock = existing.stock;
       if (typeof productData.stock === 'number') {
         if (user && user.role !== 'ADMIN' && productData.stock !== existing.stock) {
@@ -205,7 +227,6 @@ export async function saveProduct(
     }
   }
 
-  // Si es un producto NUEVO
   const newProduct: Product = {
     ...productData,
     id: `prod-${Date.now()}`,
