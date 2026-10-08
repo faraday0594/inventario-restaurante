@@ -13,6 +13,7 @@ import { WaitressOrderView } from '@/components/WaitressOrderView';
 import { KitchenOrdersView } from '@/components/KitchenOrdersView';
 import { OrdersHistoryView } from '@/components/OrdersHistoryView';
 import { MenuManagementModal } from '@/components/MenuManagementModal';
+import { UsersManagementModal } from '@/components/UsersManagementModal';
 import { 
   Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert
 } from 'lucide-react';
@@ -41,6 +42,7 @@ export default function HomePage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [isMenuManagementOpen, setIsMenuManagementOpen] = useState(false);
+  const [isUsersManagementOpen, setIsUsersManagementOpen] = useState(false);
   const [productToAdjust, setProductToAdjust] = useState<Product | null>(null);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
@@ -264,6 +266,7 @@ export default function HomePage() {
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenLogin={() => setIsLoginOpen(true)}
         onOpenMenuManagement={() => setIsMenuManagementOpen(true)}
+        onOpenUsersManagement={() => setIsUsersManagementOpen(true)}
       />
 
       {/* Alerta de permisos o error si ocurre */}
@@ -453,6 +456,14 @@ export default function HomePage() {
         isOpen={isMenuManagementOpen}
         onClose={() => setIsMenuManagementOpen(false)}
         onMenuUpdated={fetchData}
+      />
+
+      {/* Modal de Gestión de Personal y PINs */}
+      <UsersManagementModal
+        isOpen={isUsersManagementOpen}
+        onClose={() => setIsUsersManagementOpen(false)}
+        currentUser={currentUser}
+        onUsersUpdated={fetchData}
       />
 
       {/* Modal de Inicio de Sesión / Cambio de Usuario */}

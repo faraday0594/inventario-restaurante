@@ -82,20 +82,25 @@ export function WaitressOrderView({
     }
   };
 
-  // Cargar pedidos de la mesera
-  const fetchMyOrders = async () => {
-    if (!currentUser) return;
+  // Filtro para ver todos los pedidos de sala o solo los de la mesera en sesión
+  const [onlyMine, setOnlyMine] = useState(false);
+
+  // Cargar pedidos activos (de todas las meseras o solo los propios)
+  const fetchMyOrders = async (showLoading = true) => {
     try {
-      setLoadingMyOrders(true);
-      const res = await fetch(`/api/orders?active=true&waiterId=${currentUser.id}`);
+      if (showLoading) setLoadingMyOrders(true);
+      const url = onlyMine && currentUser?.id 
+        ? `/api/orders?active=true&waiterId=${currentUser.id}` 
+        : `/api/orders?active=true`;
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setMyOrders(data.orders);
       }
     } catch (err) {
-      console.error('Error cargando pedidos de la mesera:', err);
+      console.error('Error cargando pedidos activos:', err);
     } finally {
-      setLoadingMyOrders(false);
+      if (showLoading) setLoadingMyOrders(false);
     }
   };
 
@@ -105,9 +110,14 @@ export function WaitressOrderView({
 
   useEffect(() => {
     if (activeTab === 'MIS_PEDIDOS') {
-      fetchMyOrders();
+      fetchMyOrders(true);
+      // Auto-actualizar cada 5 segundos para que todas las meseras vean cambios en tiempo real
+      const interval = setInterval(() => {
+        fetchMyOrders(false);
+      }, 5000);
+      return () => clearInterval(interval);
     }
-  }, [activeTab, currentUser]);
+  }, [activeTab, onlyMine, currentUser]);
 
   // Lista unificada de categorías
   const categories = useMemo(() => {
@@ -343,7 +353,7 @@ export function WaitressOrderView({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            📋 Mis Pedidos Activos
+            📋 Pedidos en Sala
             {myOrders.length > 0 && (
               <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] flex items-center justify-center font-bold">
                 {myOrders.length}
@@ -816,13 +826,35 @@ export function WaitressOrderView({
       {/* VISTA 2: MIS PEDIDOS ACTIVOS */}
       {activeTab === 'MIS_PEDIDOS' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">
-              Pedidos activos tomados por ti ({myOrders.length})
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-black text-slate-900">
+                {onlyMine ? `Mis pedidos activos (${myOrders.length})` : `Todos los pedidos activos en sala (${myOrders.length})`}
+              </h3>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setOnlyMine(false)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                    !onlyMine ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  🌐 Todas las Mesas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnlyMine(true)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
+                    onlyMine ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  👤 Solo Mis Mesas
+                </button>
+              </div>
+            </div>
             <button
-              onClick={fetchMyOrders}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              onClick={() => fetchMyOrders(true)}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors self-end sm:self-auto"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingMyOrders ? 'animate-spin' : ''}`} />
               <span>Actualizar</span>
@@ -940,12 +972,20 @@ export function WaitressOrderView({
                     </div>
 
                     <div className="mt-3 flex items-center justify-between text-xs font-bold text-slate-500">
-                      <span>Total: ${order.total.toLocaleString('es-CO')}</span>
-                      {isReady && (
-                        <span className="text-emerald-700 font-black">
-                          ¡Ya puedes recogerlo en cocina!
+                      <div>
+                        <span>Total: </span>
+                        <strong className="text-slate-900">${order.total.toLocaleString('es-CO')}</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isReady && (
+                          <span className="text-emerald-700 font-black animate-pulse">
+                            ¡Listo!
+                          </span>
+                        )}
+                        <span className="text-[11px] font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200/60">
+                          👤 {order.waiterName}
                         </span>
-                      )}
+                      </div>
                     </div>
                   </div>
                 );

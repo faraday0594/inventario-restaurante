@@ -24,6 +24,7 @@ interface NavbarProps {
   onOpenHistory: () => void;
   onOpenLogin: () => void;
   onOpenMenuManagement: () => void;
+  onOpenUsersManagement: () => void;
 }
 
 export function Navbar({
@@ -40,7 +41,8 @@ export function Navbar({
   onOpenNewProduct,
   onOpenHistory,
   onOpenLogin,
-  onOpenMenuManagement
+  onOpenMenuManagement,
+  onOpenUsersManagement
 }: NavbarProps) {
   const isAdmin = currentUser?.role === 'ADMIN';
 
@@ -71,6 +73,18 @@ export function Navbar({
 
           {/* Acciones principales y Usuario */}
           <div className="flex items-center gap-2">
+            {/* Si es ADMIN: Gestionar Usuarios y Claves */}
+            {isAdmin && (
+              <button
+                onClick={onOpenUsersManagement}
+                className="p-2 sm:px-3 sm:py-2 rounded-xl text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-bold text-xs flex items-center gap-1.5 transition-colors border border-indigo-200/60"
+                title="Administrar meseras, personal y claves PIN"
+              >
+                <UserIcon className="w-4 h-4 text-indigo-600" />
+                <span className="hidden sm:inline">Personal & PINs</span>
+              </button>
+            )}
+
             {/* Si es ADMIN: Gestionar Menú de Platillos */}
             {isAdmin && (
               <button

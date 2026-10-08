@@ -285,6 +285,83 @@ export async function authenticateUser(userId: string, pin: string): Promise<Omi
   return null;
 }
 
+export async function saveUser(
+  userData: {
+    id?: string;
+    name: string;
+    role: UserRole;
+    pin?: string;
+    active?: boolean;
+  },
+  requester?: { role: UserRole }
+): Promise<Omit<User, 'pin'>> {
+  if (requester && requester.role !== 'ADMIN') {
+    throw new Error('Solo el Administrador puede crear o modificar usuarios');
+  }
+
+  const data = await ensureData();
+  if (!data.users) data.users = [...INITIAL_USERS];
+
+  if (userData.id) {
+    const idx = data.users.findIndex(u => u.id === userData.id);
+    if (idx !== -1) {
+      const existing = data.users[idx];
+      const updatedUser: User = {
+        ...existing,
+        name: userData.name.trim(),
+        role: userData.role,
+        pin: userData.pin ? String(userData.pin).trim() : existing.pin,
+        active: userData.active !== undefined ? userData.active : existing.active
+      };
+      data.users[idx] = updatedUser;
+      await saveData(data);
+      const { pin: _, ...safe } = updatedUser;
+      return safe;
+    }
+  }
+
+  if (!userData.pin) {
+    throw new Error('Debe asignar un PIN de acceso (ej: 4 dígitos) para el nuevo usuario');
+  }
+
+  const newUser: User = {
+    id: `user-${Date.now()}`,
+    name: userData.name.trim(),
+    role: userData.role,
+    pin: String(userData.pin).trim(),
+    active: userData.active !== undefined ? userData.active : true
+  };
+
+  data.users.push(newUser);
+  await saveData(data);
+  const { pin: _, ...safe } = newUser;
+  return safe;
+}
+
+export async function deleteUser(userId: string, requester?: { role: UserRole }): Promise<boolean> {
+  if (requester && requester.role !== 'ADMIN') {
+    throw new Error('Solo el Administrador puede eliminar usuarios');
+  }
+
+  const data = await ensureData();
+  if (!data.users) return false;
+
+  const userToDelete = data.users.find(u => u.id === userId);
+  if (!userToDelete) return false;
+
+  // No permitir borrar el admin si es el único
+  if (userToDelete.role === 'ADMIN') {
+    const adminCount = data.users.filter(u => u.role === 'ADMIN').length;
+    if (adminCount <= 1) {
+      throw new Error('No se puede eliminar el único Administrador del sistema');
+    }
+  }
+
+  data.users = data.users.filter(u => u.id !== userId);
+  await saveData(data);
+  return true;
+}
+
 // ==========================================
 // PRODUCTOS
 // ==========================================
