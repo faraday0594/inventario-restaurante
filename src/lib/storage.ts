@@ -44,8 +44,12 @@ let pgPool: Pool | null = null;
 function getPgPool(): Pool | null {
   const dbUrl = 
     process.env.POSTGRES_URL || 
+    process.env.STORAGE_URL || 
+    process.env.STORAGE_POSTGRES_URL || 
     process.env.DATABASE_URL || 
-    process.env.POSTGRES_URL_NON_POOLING;
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.STORAGE_URL_NON_POOLING;
 
   if (!dbUrl) return null;
 
