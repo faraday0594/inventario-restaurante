@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Product, User } from '@/lib/types';
+import { compressAndResizeImage, compressAndResizeDataUrl } from '@/lib/imageUtils';
 import { 
   X, Camera, ImageIcon, Sparkles, Check, AlertCircle, RefreshCw, PlusCircle, ArrowRight, Trash2, Filter
 } from 'lucide-react';
@@ -48,6 +49,7 @@ export function InvoiceScannerModal({
   if (!isOpen) return null;
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStep, setScanStep] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +65,8 @@ export function InvoiceScannerModal({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // Manejar carga de imagen
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Manejar carga de imagen con compresión automática para celular
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -73,16 +75,22 @@ export function InvoiceScannerModal({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImagePreview(reader.result as string);
-      setError(null);
+    setIsCompressing(true);
+    setError(null);
+
+    try {
+      // Comprime fotos de celular de 10MB-20MB a ~350KB para evitar el límite 4.5MB de Vercel
+      const optimizedBase64 = await compressAndResizeImage(file, 1600, 0.82);
+      setImagePreview(optimizedBase64);
       setItems([]);
       setSuccessMessage(null);
-    };
-    reader.readAsDataURL(file);
-    // Limpiar input para permitir seleccionar la misma foto si se desea
-    e.target.value = '';
+    } catch (err: any) {
+      console.error('Error optimizando foto:', err);
+      setError('No se pudo procesar la foto del teléfono. Por favor intenta de nuevo.');
+    } finally {
+      setIsCompressing(false);
+      e.target.value = '';
+    }
   };
 
   // Enviar a la API de MiniMax Vision
@@ -94,13 +102,29 @@ export function InvoiceScannerModal({
     setScanStep('Analizando factura con MiniMax-M3 Vision...');
 
     try {
+      let payloadImage = imagePreview;
+      // Reducción preventiva si el base64 es grande para asegurar que no toque el límite 4.5MB
+      if (imagePreview.length > 2 * 1024 * 1024) {
+        setScanStep('Optimizando foto para transmisión ultrarrápida...');
+        payloadImage = await compressAndResizeDataUrl(imagePreview, 1400, 0.75);
+      }
+
       const res = await fetch('/api/scan-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imagePreview })
+        body: JSON.stringify({ image: payloadImage })
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        if (res.status === 413 || rawText.toLowerCase().includes('entity too large')) {
+          throw new Error('La foto es demasiado pesada para el servidor (límite 4.5MB). Por favor selecciona la foto nuevamente para comprimirla automáticamente.');
+        }
+        throw new Error(`Error en servidor (${res.status}): ${rawText.slice(0, 120)}`);
+      }
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'No se pudo procesar la factura con la IA');
@@ -228,7 +252,14 @@ export function InvoiceScannerModal({
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Error inesperado del servidor (${res.status}): ${rawText.slice(0, 120)}`);
+      }
+
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Error al actualizar inventario');
       }
