@@ -256,8 +256,15 @@ export function KitchenOrdersView({ currentUser, onRefreshData }: KitchenOrdersV
                       }`}>
                         {order.tableNumber || (order.type === 'PARA_LLEVAR' ? '🥡 PARA LLEVAR' : '🛵 DOMICILIO')}
                       </span>
+                      {order.subAccount && (
+                        <span className={`text-xs font-black px-2 py-0.5 rounded-md inline-block mt-1 ${
+                          isReady ? 'bg-emerald-700 text-white' : 'bg-purple-100 text-purple-900 border border-purple-200'
+                        }`}>
+                          🧾 {order.subAccount}
+                        </span>
+                      )}
                       {order.customerName && (
-                        <span className={`text-xs font-bold block ${isReady ? 'text-emerald-100' : 'text-slate-600'}`}>
+                        <span className={`text-xs font-bold block mt-0.5 ${isReady ? 'text-emerald-100' : 'text-slate-600'}`}>
                           Cliente: {order.customerName}
                         </span>
                       )}

@@ -26,9 +26,11 @@ export function WaitressOrderView({
   // Pestaña principal: 'CREAR' (Tomar Comanda) o 'MIS_PEDIDOS' (Seguimiento de mesas)
   const [activeTab, setActiveTab] = useState<'CREAR' | 'MIS_PEDIDOS'>('CREAR');
 
-  // Tipo de orden y mesa
+  // Tipo de orden, mesa y subcuentas (cuentas separadas)
   const [orderType, setOrderType] = useState<'MESA' | 'PARA_LLEVAR' | 'DOMICILIO'>('MESA');
   const [selectedTable, setSelectedTable] = useState<string>('Mesa 1');
+  const [subAccount, setSubAccount] = useState<string>('Cuenta 1');
+  const [customDinerName, setCustomDinerName] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>('');
   const [generalNotes, setGeneralNotes] = useState<string>('');
 
@@ -217,9 +219,11 @@ export function WaitressOrderView({
     setStatusMessage(null);
 
     try {
+      const activeSubAccount = customDinerName.trim() || subAccount;
       const payload = {
         type: orderType,
         tableNumber: orderType === 'MESA' ? selectedTable : undefined,
+        subAccount: orderType === 'MESA' ? activeSubAccount : undefined,
         customerName: orderType !== 'MESA' ? customerName : undefined,
         notes: generalNotes,
         user: currentUser,
@@ -245,13 +249,19 @@ export function WaitressOrderView({
         throw new Error(data.error || 'Error al enviar comanda');
       }
 
-      // Éxito: Limpiar carrito
+      // Éxito: Limpiar carrito y conservar o resetear subcuenta
       setCart([]);
       setGeneralNotes('');
       setCustomerName('');
+      setCustomDinerName('');
+
+      const tableInfo = orderType === 'MESA' 
+        ? `${selectedTable} (${activeSubAccount})` 
+        : 'Para llevar';
+
       setStatusMessage({ 
         type: 'success', 
-        text: `¡Comanda #${data.order.orderNumber} enviada con éxito a Cocina! (${orderType === 'MESA' ? selectedTable : 'Para llevar'})` 
+        text: `¡Comanda #${data.order.orderNumber} enviada con éxito a Cocina! (${tableInfo})` 
       });
 
       if (onOrderCreated) onOrderCreated();
@@ -427,6 +437,52 @@ export function WaitressOrderView({
                     <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg">
                       Seleccionada: {selectedTable}
                     </span>
+                  </div>
+
+                  {/* Selector de Subcuenta / Cuentas Separadas en la misma mesa */}
+                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                        ¿Cuentas Separadas en esta mesa?
+                      </span>
+                      <span className="text-[11px] font-black text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200/50">
+                        {selectedTable} • {customDinerName.trim() || subAccount}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {['Cuenta 1', 'Cuenta 2', 'Cuenta 3', 'Cuenta 4'].map((cta) => {
+                        const isSel = subAccount === cta && !customDinerName;
+                        return (
+                          <button
+                            key={cta}
+                            type="button"
+                            onClick={() => {
+                              playTapSound();
+                              setSubAccount(cta);
+                              setCustomDinerName('');
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                              isSel
+                                ? 'bg-purple-600 text-white shadow-sm'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            🧾 {cta}
+                          </button>
+                        );
+                      })}
+
+                      <div className="flex-1 min-w-[130px]">
+                        <input
+                          type="text"
+                          value={customDinerName}
+                          onChange={(e) => setCustomDinerName(e.target.value)}
+                          placeholder="O persona (ej: Carlos, Pareja 1)..."
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -620,7 +676,9 @@ export function WaitressOrderView({
                   </div>
                   <div>
                     <h3 className="text-sm font-black text-slate-900">
-                      {orderType === 'MESA' ? selectedTable : orderType === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio'}
+                      {orderType === 'MESA' 
+                        ? `${selectedTable} • ${customDinerName.trim() || subAccount}` 
+                        : orderType === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio'}
                     </h3>
                     <p className="text-[10px] text-slate-500 font-medium">
                       {totalItemsCount} {totalItemsCount === 1 ? 'producto' : 'productos'} en comanda
@@ -771,6 +829,49 @@ export function WaitressOrderView({
             </button>
           </div>
 
+          {/* Resumen de mesas con cuentas múltiples activas para facilitar el cobro */}
+          {(() => {
+            const tableGroups = myOrders.reduce((acc, ord) => {
+              if (ord.tableNumber) {
+                if (!acc[ord.tableNumber]) acc[ord.tableNumber] = [];
+                acc[ord.tableNumber].push(ord);
+              }
+              return acc;
+            }, {} as Record<string, typeof myOrders>);
+
+            const multiTables = Object.entries(tableGroups).filter(([_, list]) => list.length > 1);
+            if (multiTables.length === 0) return null;
+
+            return (
+              <div className="p-4 rounded-3xl bg-purple-50 border border-purple-200/80 space-y-2 animate-fade-in shadow-xs">
+                <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
+                  💡 Mesas con Cuentas Separadas activas (Cobro de Sala):
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                  {multiTables.map(([tbl, ords]) => {
+                    const combinedTotal = ords.reduce((s, o) => s + o.total, 0);
+                    return (
+                      <div key={tbl} className="bg-white p-3 rounded-2xl border border-purple-200 text-xs shadow-xs">
+                        <div className="flex justify-between items-center font-bold text-slate-900 pb-1 border-b border-slate-100">
+                          <span className="font-black">🪑 {tbl}</span>
+                          <span className="text-purple-700 font-black">${combinedTotal.toLocaleString('es-CO')} Total</span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 mt-1.5 space-y-1">
+                          {ords.map(o => (
+                            <div key={o.id} className="flex justify-between items-center">
+                              <span className="truncate pr-1">• {o.subAccount || `Comanda #${o.orderNumber}`}:</span>
+                              <span className="font-black text-slate-800 shrink-0">${o.total.toLocaleString('es-CO')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {myOrders.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-3xl border border-slate-200">
               <ChefHat className="w-12 h-12 text-slate-300 mx-auto mb-2" />
@@ -796,9 +897,16 @@ export function WaitressOrderView({
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <span className="text-base font-black text-slate-900 block">
-                          {order.tableNumber || (order.type === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio')}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-base font-black text-slate-900 block">
+                            {order.tableNumber || (order.type === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio')}
+                          </span>
+                          {order.subAccount && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                              🧾 {order.subAccount}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[11px] font-bold text-slate-400">
                           Comanda #{order.orderNumber} • {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>

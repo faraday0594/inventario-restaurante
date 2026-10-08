@@ -229,6 +229,11 @@ export function OrdersHistoryView({ currentUser, onRefreshData }: OrdersHistoryV
                           <h4 className="text-sm font-black text-slate-900">
                             {order.tableNumber || (order.type === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio')}
                           </h4>
+                          {order.subAccount && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                              🧾 {order.subAccount}
+                            </span>
+                          )}
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                             isDelivered
                               ? 'bg-emerald-100 text-emerald-800'

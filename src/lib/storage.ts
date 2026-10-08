@@ -594,6 +594,7 @@ export async function createOrder(
   orderInput: {
     type: OrderType;
     tableNumber?: string;
+    subAccount?: string;
     customerName?: string;
     items: Array<{
       itemType: 'DISH' | 'PRODUCT';
@@ -634,11 +635,14 @@ export async function createOrder(
     };
   });
 
+  const subAccountStr = orderInput.subAccount?.trim() || undefined;
+
   const newOrder: Order = {
     id: `ord-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     orderNumber,
     type: orderInput.type,
     tableNumber: orderInput.type === 'MESA' ? (orderInput.tableNumber || 'Mesa 1') : undefined,
+    subAccount: orderInput.type === 'MESA' ? subAccountStr : undefined,
     customerName: orderInput.customerName?.trim() || undefined,
     items: processedItems,
     status: 'PENDIENTE',
@@ -650,6 +654,10 @@ export async function createOrder(
     createdAt: nowIso,
     updatedAt: nowIso
   };
+
+  const tableLabel = newOrder.tableNumber 
+    ? `${newOrder.tableNumber}${newOrder.subAccount ? ` (${newOrder.subAccount})` : ''}` 
+    : 'Para llevar';
 
   // Descuento automático de inventario para bebidas / productos
   for (const item of processedItems) {
@@ -670,7 +678,7 @@ export async function createOrder(
           quantity: item.quantity,
           previousStock: prevStock,
           newStock: newStock,
-          reason: `Venta Comanda #${orderNumber} (${newOrder.tableNumber || 'Para llevar'}) - Mesera: ${waiter.name}`,
+          reason: `Venta Comanda #${orderNumber} (${tableLabel}) - Mesera: ${waiter.name}`,
           userId: waiter.id,
           userName: waiter.name,
           userRole: 'MESERA',

@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { type, tableNumber, customerName, items, notes, user } = body;
+    const { type, tableNumber, subAccount, customerName, items, notes, user } = body;
 
     if (!user || !user.id || !user.name) {
       return NextResponse.json(
@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       {
         type: (type as OrderType) || 'MESA',
         tableNumber,
+        subAccount,
         customerName,
         items,
         notes

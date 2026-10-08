@@ -37,6 +37,7 @@ export interface Order {
   orderNumber: number; // Consecutivo diario: #1, #2...
   type: OrderType;
   tableNumber?: string;
+  subAccount?: string; // Ej: 'Cuenta 1', 'Cuenta 2', o nombre del comensal
   customerName?: string;
   items: OrderItem[];
   status: OrderStatus;
