@@ -13,6 +13,7 @@ interface WaitressOrderViewProps {
   products: Product[];
   onOrderCreated?: () => void;
   onRefreshData?: () => void;
+  onOpenMenuManagement?: () => void;
 }
 
 const TABLES = Array.from({ length: 15 }, (_, i) => `Mesa ${i + 1}`);
@@ -21,7 +22,8 @@ export function WaitressOrderView({
   currentUser,
   products,
   onOrderCreated,
-  onRefreshData
+  onRefreshData,
+  onOpenMenuManagement
 }: WaitressOrderViewProps) {
   // Pestaña principal: 'CREAR' (Tomar Comanda) o 'MIS_PEDIDOS' (Seguimiento de mesas)
   const [activeTab, setActiveTab] = useState<'CREAR' | 'MIS_PEDIDOS'>('CREAR');
@@ -106,7 +108,7 @@ export function WaitressOrderView({
 
   useEffect(() => {
     fetchMenu();
-  }, []);
+  }, [products]);
 
   useEffect(() => {
     if (activeTab === 'MIS_PEDIDOS') {
@@ -549,31 +551,45 @@ export function WaitressOrderView({
                 </div>
               </div>
 
-              {/* Categorías pill */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                <button
-                  onClick={() => setSelectedCategory('TODAS')}
-                  className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
-                    selectedCategory === 'TODAS'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Todas las categorías
-                </button>
-                {categories.map(cat => (
+              {/* Categorías pill y botón de Admin para agregar platos */}
+              <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => setSelectedCategory('TODAS')}
                     className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
-                      selectedCategory === cat
+                      selectedCategory === 'TODAS'
                         ? 'bg-purple-600 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {cat}
+                    Todas las categorías
                   </button>
-                ))}
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
+                        selectedCategory === cat
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {currentUser?.role === 'ADMIN' && onOpenMenuManagement && (
+                  <button
+                    type="button"
+                    onClick={onOpenMenuManagement}
+                    className="px-3 py-1 rounded-xl text-[11px] font-black bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200 flex items-center gap-1 transition-all whitespace-nowrap shrink-0 shadow-xs"
+                    title="Crear o editar platillos y porciones del restaurante"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>+ Plato / Porción</span>
+                  </button>
+                )}
               </div>
             </div>
 

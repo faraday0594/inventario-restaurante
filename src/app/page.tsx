@@ -405,6 +405,7 @@ export default function HomePage() {
             products={products}
             onOrderCreated={fetchData}
             onRefreshData={fetchData}
+            onOpenMenuManagement={() => setIsMenuManagementOpen(true)}
           />
         )}
 

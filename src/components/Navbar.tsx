@@ -100,7 +100,7 @@ export function Navbar({
                 title="Configurar platillos del restaurante"
               >
                 <UtensilsCrossed className="w-4 h-4 text-purple-600" />
-                <span className="hidden lg:inline">Editar Menú Platos</span>
+                <span className="hidden sm:inline">Menú & Platos</span>
               </button>
             )}
 

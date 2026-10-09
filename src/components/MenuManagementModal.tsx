@@ -10,7 +10,17 @@ interface MenuManagementModalProps {
   onMenuUpdated?: () => void;
 }
 
-const DEFAULT_CATEGORIES = ['Almuerzos', 'Especiales', 'Sopas', 'Comidas Rápidas', 'Desayunos', 'Adicionales', 'Postres'];
+const DEFAULT_CATEGORIES = [
+  'Almuerzos', 
+  'Especiales', 
+  'Sopas', 
+  'Comidas Rápidas', 
+  'Desayunos', 
+  'Porciones & Adicionales', 
+  'Bebidas Caseras', 
+  'Postres',
+  'OTRA'
+];
 
 export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuManagementModalProps) {
   if (!isOpen) return null;
@@ -24,6 +34,8 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Almuerzos');
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [customCategory, setCustomCategory] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [available, setAvailable] = useState(true);
@@ -50,7 +62,15 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
   const handleStartEdit = (item: MenuItem) => {
     setEditingId(item.id);
     setName(item.name);
-    setCategory(item.category);
+    if (DEFAULT_CATEGORIES.includes(item.category) && item.category !== 'OTRA') {
+      setCategory(item.category);
+      setIsCustomCategory(false);
+      setCustomCategory('');
+    } else {
+      setCategory('OTRA');
+      setIsCustomCategory(true);
+      setCustomCategory(item.category);
+    }
     setPrice(item.price.toString());
     setDescription(item.description || '');
     setAvailable(item.available);
@@ -60,6 +80,8 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
     setEditingId(null);
     setName('');
     setCategory('Almuerzos');
+    setIsCustomCategory(false);
+    setCustomCategory('');
     setPrice('');
     setDescription('');
     setAvailable(true);
@@ -68,8 +90,9 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !price) {
-      setError('Nombre y precio son obligatorios');
+    const finalCategory = isCustomCategory ? customCategory.trim() : category;
+    if (!name.trim() || !price || !finalCategory) {
+      setError('Nombre, precio y categoría son obligatorios');
       return;
     }
 
@@ -83,7 +106,7 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
         body: JSON.stringify({
           id: editingId || undefined,
           name: name.trim(),
-          category: category.trim(),
+          category: finalCategory,
           price: Number(price),
           description: description.trim(),
           available
@@ -99,7 +122,7 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
       fetchMenu();
       if (onMenuUpdated) onMenuUpdated();
     } catch (err: any) {
-      setError(err.message || 'Error guardando platillo');
+      setError(err.message || 'Error guardando platillo o porción');
     } finally {
       setSaving(false);
     }
@@ -150,7 +173,7 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
           <form onSubmit={handleSave} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase text-slate-700">
-                {editingId ? 'Editar Platillo' : '➕ Agregar Nuevo Platillo'}
+                {editingId ? 'Editar Platillo o Porción' : '➕ Agregar Nuevo Platillo o Porción'}
               </span>
               {editingId && (
                 <button
@@ -165,12 +188,14 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Nombre del Plato</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                  Nombre del Plato o Porción
+                </label>
                 <input
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  placeholder="Ej: Bandeja Paisa, Sancocho, Pechuga..."
+                  placeholder="Ej: Bandeja Paisa, Porción de Papas, Arroz adicional..."
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-purple-500"
                   required
                 />
@@ -194,13 +219,30 @@ export function MenuManagementModal({ isOpen, onClose, onMenuUpdated }: MenuMana
                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Categoría</label>
                 <select
                   value={category}
-                  onChange={e => setCategory(e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setCategory(val);
+                    setIsCustomCategory(val === 'OTRA');
+                  }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-purple-500"
                 >
                   {DEFAULT_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat}>
+                      {cat === 'OTRA' ? '✏️ Otra categoría personalizada...' : cat}
+                    </option>
                   ))}
                 </select>
+
+                {isCustomCategory && (
+                  <input
+                    type="text"
+                    value={customCategory}
+                    onChange={e => setCustomCategory(e.target.value)}
+                    placeholder="Escribe la categoría (ej: Porciones, Entradas)..."
+                    className="mt-2 w-full px-3 py-2 rounded-xl border border-purple-200 bg-purple-50/50 text-xs font-bold focus:ring-2 focus:ring-purple-500"
+                    required
+                  />
+                )}
               </div>
 
               <div>
