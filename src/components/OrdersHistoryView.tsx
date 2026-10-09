@@ -227,7 +227,7 @@ export function OrdersHistoryView({ currentUser, onRefreshData }: OrdersHistoryV
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="text-sm font-black text-slate-900">
-                            {order.tableNumber || (order.type === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio')}
+                            {order.tableNumber || '🥡 Para Llevar'}
                           </h4>
                           {order.subAccount && (
                             <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">

@@ -27,7 +27,7 @@ export function WaitressOrderView({
   const [activeTab, setActiveTab] = useState<'CREAR' | 'MIS_PEDIDOS'>('CREAR');
 
   // Tipo de orden, mesa y subcuentas (cuentas separadas)
-  const [orderType, setOrderType] = useState<'MESA' | 'PARA_LLEVAR' | 'DOMICILIO'>('MESA');
+  const [orderType, setOrderType] = useState<'MESA' | 'PARA_LLEVAR'>('MESA');
   const [selectedTable, setSelectedTable] = useState<string>('Mesa 1');
   const [subAccount, setSubAccount] = useState<string>('Cuenta 1');
   const [customDinerName, setCustomDinerName] = useState<string>('');
@@ -394,27 +394,19 @@ export function WaitressOrderView({
                 <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
                   <button
                     onClick={() => setOrderType('MESA')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      orderType === 'MESA' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600'
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      orderType === 'MESA' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     🪑 En Mesa
                   </button>
                   <button
                     onClick={() => setOrderType('PARA_LLEVAR')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      orderType === 'PARA_LLEVAR' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600'
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                      orderType === 'PARA_LLEVAR' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     🥡 Para Llevar
-                  </button>
-                  <button
-                    onClick={() => setOrderType('DOMICILIO')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      orderType === 'DOMICILIO' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600'
-                    }`}
-                  >
-                    🛵 Domicilio
                   </button>
                 </div>
               </div>
@@ -501,7 +493,7 @@ export function WaitressOrderView({
                     type="text"
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
-                    placeholder="Nombre del cliente o dirección (ej: Sr. Martínez / Calle 45 #12)..."
+                    placeholder="Nombre del cliente o detalles del pedido para llevar (ej: Juan Pérez)..."
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
@@ -931,7 +923,7 @@ export function WaitressOrderView({
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-base font-black text-slate-900 block">
-                            {order.tableNumber || (order.type === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio')}
+                            {order.tableNumber || '🥡 Para Llevar'}
                           </span>
                           {order.subAccount && (
                             <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">

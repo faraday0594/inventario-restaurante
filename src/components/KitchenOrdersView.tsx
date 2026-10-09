@@ -254,7 +254,7 @@ export function KitchenOrdersView({ currentUser, onRefreshData }: KitchenOrdersV
                       <span className={`text-2xl font-black block leading-tight ${
                         isReady ? 'text-white' : 'text-slate-950'
                       }`}>
-                        {order.tableNumber || (order.type === 'PARA_LLEVAR' ? '🥡 PARA LLEVAR' : '🛵 DOMICILIO')}
+                        {order.tableNumber || '🥡 PARA LLEVAR'}
                       </span>
                       {order.subAccount && (
                         <span className={`text-xs font-black px-2 py-0.5 rounded-md inline-block mt-1 ${

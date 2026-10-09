@@ -96,7 +96,7 @@ export default function HomePage() {
               playReadyOrderChime();
               setReadyNotification({
                 id: order.id,
-                tableName: order.orderType === 'MESA' ? (order.tableName || 'Mesa') : 'Para Llevar / Domicilio',
+                tableName: order.orderType === 'MESA' ? (order.tableName || 'Mesa') : '🥡 Para Llevar',
                 subAccount: order.subAccount,
                 waiterName: order.waiterName,
                 time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
