@@ -92,39 +92,69 @@ export const INITIAL_USERS: User[] = [
     pin: '9999',
     active: true
   },
+  // MESERAS
   {
-    id: 'user-emp-1',
-    name: 'Carlos (Bodega)',
-    role: 'EMPLEADO',
-    pin: '1234',
-    active: true
-  },
-  {
-    id: 'user-emp-2',
-    name: 'Ana (Turno Barra)',
-    role: 'EMPLEADO',
-    pin: '5678',
-    active: true
-  },
-  {
-    id: 'user-mesera-1',
-    name: 'Laura (Mesera)',
+    id: 'user-mesera-yeraldin',
+    name: 'Yeraldin (Mesera)',
     role: 'MESERA',
-    pin: '2222',
+    pin: '1001',
     active: true
   },
   {
-    id: 'user-mesera-2',
-    name: 'Valentina (Mesera)',
+    id: 'user-mesera-yohana',
+    name: 'Yohana (Mesera)',
     role: 'MESERA',
-    pin: '3333',
+    pin: '1002',
     active: true
   },
   {
-    id: 'user-cocina',
-    name: 'Cocina Principal',
+    id: 'user-mesera-alejandra',
+    name: 'Alejandra (Mesera)',
+    role: 'MESERA',
+    pin: '1003',
+    active: true
+  },
+  {
+    id: 'user-mesera-bleidy',
+    name: 'Bleidy (Mesera)',
+    role: 'MESERA',
+    pin: '1004',
+    active: true
+  },
+  // COCINERAS
+  {
+    id: 'user-cocina-edelmira',
+    name: 'Edelmira (Cocina)',
     role: 'COCINA',
-    pin: '4444',
+    pin: '2001',
+    active: true
+  },
+  {
+    id: 'user-cocina-ingrid',
+    name: 'Ingrid (Cocina)',
+    role: 'COCINA',
+    pin: '2002',
+    active: true
+  },
+  {
+    id: 'user-cocina-maria',
+    name: 'María (Cocina)',
+    role: 'COCINA',
+    pin: '2003',
+    active: true
+  },
+  {
+    id: 'user-cocina-sandra',
+    name: 'Sandra (Cocina)',
+    role: 'COCINA',
+    pin: '2004',
+    active: true
+  },
+  {
+    id: 'user-cocina-claudia',
+    name: 'Claudia (Cocina)',
+    role: 'COCINA',
+    pin: '2005',
     active: true
   }
 ];
@@ -154,8 +184,13 @@ function getPgPool(): Pool | null {
 
 function normalizeData(data: InventoryData): InventoryData {
   if (!data.users || !Array.isArray(data.users) || data.users.length === 0) {
-    data.users = INITIAL_USERS;
+    data.users = [...INITIAL_USERS];
   } else {
+    // Remover usuarios dummy de prueba anteriores si existen
+    const dummyIds = ['user-emp-1', 'user-emp-2', 'user-mesera-1', 'user-mesera-2', 'user-cocina'];
+    data.users = data.users.filter(u => !dummyIds.includes(u.id));
+
+    // Asegurar que cada usuario de INITIAL_USERS esté presente
     for (const initU of INITIAL_USERS) {
       if (!data.users.some(u => u.id === initU.id)) {
         data.users.push(initU);

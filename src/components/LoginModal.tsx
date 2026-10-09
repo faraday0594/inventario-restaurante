@@ -194,7 +194,13 @@ export function LoginModal({
                     PIN de Seguridad (4 dígitos)
                   </label>
                   <span className="text-[10px] text-slate-400">
-                    {selectedUser.role === 'ADMIN' ? 'PIN por defecto: 9999' : selectedUser.name.includes('Carlos') ? 'PIN: 1234' : 'PIN: 5678'}
+                    {selectedUser.role === 'ADMIN' 
+                      ? 'PIN: 9999' 
+                      : selectedUser.role === 'MESERA' 
+                      ? 'PIN: 1001 a 1004' 
+                      : selectedUser.role === 'COCINA'
+                      ? 'PIN: 2001 a 2005'
+                      : 'PIN de 4 dígitos'}
                   </span>
                 </div>
 

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Movement, MovementType, User } from '@/lib/types';
+import { playReadyOrderChime } from '@/lib/soundUtils';
 import { Navbar, ActiveView } from '@/components/Navbar';
 import { StockCard } from '@/components/StockCard';
 import { AdjustStockModal } from '@/components/AdjustStockModal';
@@ -15,7 +16,8 @@ import { OrdersHistoryView } from '@/components/OrdersHistoryView';
 import { MenuManagementModal } from '@/components/MenuManagementModal';
 import { UsersManagementModal } from '@/components/UsersManagementModal';
 import { 
-  Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert
+  Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert,
+  Bell, X
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -45,6 +47,84 @@ export default function HomePage() {
   const [isUsersManagementOpen, setIsUsersManagementOpen] = useState(false);
   const [productToAdjust, setProductToAdjust] = useState<Product | null>(null);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+
+  // Notificación en vivo para meseras cuando la cocina saca un pedido LISTO
+  interface ReadyNotification {
+    id: string;
+    tableName: string;
+    subAccount?: string;
+    waiterName?: string;
+    time: string;
+  }
+  const [readyNotification, setReadyNotification] = useState<ReadyNotification | null>(null);
+  const knownReadyOrderIdsRef = useRef<Set<string>>(new Set());
+  const isFirstPollRef = useRef<boolean>(true);
+
+  // Auto-cerrar la notificación de plato listo tras 12 segundos
+  useEffect(() => {
+    if (readyNotification) {
+      const timer = setTimeout(() => {
+        setReadyNotification(null);
+      }, 12000);
+      return () => clearTimeout(timer);
+    }
+  }, [readyNotification]);
+
+  // Sondeo en segundo plano (cada 4 seg) para alertar a las Meseras y al Admin cuando un pedido está LISTO
+  useEffect(() => {
+    if (!currentUser || (currentUser.role !== 'MESERA' && currentUser.role !== 'ADMIN')) {
+      return;
+    }
+
+    const checkReadyOrders = async () => {
+      try {
+        const res = await fetch('/api/orders?active=true');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.orders)) {
+          const readyOrders = data.orders.filter((o: any) => o.status === 'LISTO');
+
+          if (isFirstPollRef.current) {
+            readyOrders.forEach((o: any) => knownReadyOrderIdsRef.current.add(o.id));
+            isFirstPollRef.current = false;
+            return;
+          }
+
+          for (const order of readyOrders) {
+            if (!knownReadyOrderIdsRef.current.has(order.id)) {
+              knownReadyOrderIdsRef.current.add(order.id);
+              // Campanilla de servicio y banner flotante
+              playReadyOrderChime();
+              setReadyNotification({
+                id: order.id,
+                tableName: order.orderType === 'MESA' ? (order.tableName || 'Mesa') : 'Para Llevar / Domicilio',
+                subAccount: order.subAccount,
+                waiterName: order.waiterName,
+                time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+              });
+              break;
+            }
+          }
+        }
+      } catch {
+        // Ignorar errores puntuales de red en el sondeo de fondo
+      }
+    };
+
+    checkReadyOrders();
+    const interval = setInterval(checkReadyOrders, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  // Vista efectiva según el rol estricto del usuario
+  const effectiveView: ActiveView = useMemo(() => {
+    if (currentUser?.role === 'COCINA') return 'KITCHEN';
+    if (currentUser?.role === 'MESERA') {
+      if (currentView === 'KITCHEN' || currentView === 'HISTORY') return 'WAITRESS';
+      return currentView;
+    }
+    if (currentUser?.role === 'EMPLEADO') return 'INVENTORY';
+    return currentView;
+  }, [currentUser, currentView]);
 
   // Cargar usuario desde localStorage y configurar vista según rol
   useEffect(() => {
@@ -249,7 +329,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col font-sans">
       {/* Barra de Navegación con Selector de Módulos */}
       <Navbar
-        currentView={currentView}
+        currentView={effectiveView}
         onSelectView={setCurrentView}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
@@ -269,6 +349,38 @@ export default function HomePage() {
         onOpenUsersManagement={() => setIsUsersManagementOpen(true)}
       />
 
+      {/* NOTIFICACIÓN FLOTANTE EN VIVO CUANDO COCINA PONE UN PEDIDO EN 'LISTO' (MESERAS Y ADMIN) */}
+      {readyNotification && (
+        <div className="fixed top-20 right-4 left-4 sm:left-auto sm:w-96 z-50 animate-bounce-once shadow-2xl">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-2xl border-2 border-emerald-300 shadow-emerald-500/30 flex items-start justify-between gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+              <Bell className="w-5 h-5 text-amber-300 animate-bounce stroke-[2.5]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
+                  🔔 ¡PLATO LISTO EN COCINA!
+                </span>
+                <span className="text-[10px] text-emerald-200">{readyNotification.time}</span>
+              </div>
+              <h4 className="text-sm font-black mt-1 leading-snug">
+                {readyNotification.tableName} {readyNotification.subAccount ? `(${readyNotification.subAccount})` : ''}
+              </h4>
+              <p className="text-xs text-emerald-100 font-medium">
+                Tomado por: {readyNotification.waiterName || 'Mesera'} • ¡Listo para retirar y servir!
+              </p>
+            </div>
+            <button
+              onClick={() => setReadyNotification(null)}
+              className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+              title="Cerrar notificación"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Alerta de permisos o error si ocurre */}
       {actionError && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 w-full">
@@ -287,7 +399,7 @@ export default function HomePage() {
       {/* CONTENIDO PRINCIPAL SEGÚN EL MÓDULO ACTIVO */}
       <div className="flex-1">
         {/* MÓDULO 1: COMANDAS / VENTAS (MESERAS) */}
-        {currentView === 'WAITRESS' && (
+        {effectiveView === 'WAITRESS' && (
           <WaitressOrderView
             currentUser={currentUser}
             products={products}
@@ -297,7 +409,7 @@ export default function HomePage() {
         )}
 
         {/* MÓDULO 2: COCINA (KDS EN VIVO) */}
-        {currentView === 'KITCHEN' && (
+        {effectiveView === 'KITCHEN' && (
           <KitchenOrdersView
             currentUser={currentUser}
             onRefreshData={fetchData}
@@ -305,7 +417,7 @@ export default function HomePage() {
         )}
 
         {/* MÓDULO 3: HISTORIAL DIARIO DE VENTAS */}
-        {currentView === 'HISTORY' && (
+        {effectiveView === 'HISTORY' && (
           <OrdersHistoryView
             currentUser={currentUser}
             onRefreshData={fetchData}
@@ -313,7 +425,7 @@ export default function HomePage() {
         )}
 
         {/* MÓDULO 4: BODEGA & BEBIDAS (INVENTARIO) */}
-        {currentView === 'INVENTORY' && (
+        {effectiveView === 'INVENTORY' && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-fade-in">
             {/* Banner de bienvenida y métricas de bodega */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
