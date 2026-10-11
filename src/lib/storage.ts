@@ -69,7 +69,7 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   {
     id: 'dish-7',
     name: 'Porción de Papas a la Francesa',
-    category: 'Adicionales',
+    category: 'Porciones & Adicionales',
     price: 7000,
     description: 'Papas crocantes con salsa tártara y tomate',
     available: true
@@ -77,9 +77,41 @@ export const INITIAL_MENU_ITEMS: MenuItem[] = [
   {
     id: 'dish-8',
     name: 'Porción de Patacones con Hogao',
-    category: 'Adicionales',
+    category: 'Porciones & Adicionales',
     price: 8000,
     description: 'Patacones de plátano verde con hogao tradicional',
+    available: true
+  },
+  {
+    id: 'dish-9',
+    name: 'Porción de Arroz Blanco',
+    category: 'Porciones & Adicionales',
+    price: 4000,
+    description: 'Porción individual de arroz blanco tradicional',
+    available: true
+  },
+  {
+    id: 'dish-10',
+    name: 'Porción de Aguacate Fresco',
+    category: 'Porciones & Adicionales',
+    price: 3500,
+    description: 'Tajada o porción de aguacate fresco',
+    available: true
+  },
+  {
+    id: 'dish-11',
+    name: 'Huevo Frito Adicional',
+    category: 'Porciones & Adicionales',
+    price: 2500,
+    description: 'Huevo frito adicional al gusto',
+    available: true
+  },
+  {
+    id: 'dish-12',
+    name: 'Porción de Chicharrón Crocante',
+    category: 'Porciones & Adicionales',
+    price: 9000,
+    description: 'Porción de chicharrón crocante',
     available: true
   }
 ];
@@ -201,6 +233,13 @@ function normalizeData(data: InventoryData): InventoryData {
   if (!data.movements || !Array.isArray(data.movements)) data.movements = [];
   if (!data.menuItems || !Array.isArray(data.menuItems) || data.menuItems.length === 0) {
     data.menuItems = INITIAL_MENU_ITEMS;
+  } else {
+    // Asegurar que las porciones de INITIAL_MENU_ITEMS estén presentes
+    for (const initM of INITIAL_MENU_ITEMS) {
+      if (!data.menuItems.some(m => m.id === initM.id || m.name.toLowerCase() === initM.name.toLowerCase())) {
+        data.menuItems.push(initM);
+      }
+    }
   }
   if (!data.orders || !Array.isArray(data.orders)) data.orders = [];
   return data;

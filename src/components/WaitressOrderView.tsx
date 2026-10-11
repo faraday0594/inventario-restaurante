@@ -41,7 +41,7 @@ export function WaitressOrderView({
   const [loadingMenu, setLoadingMenu] = useState(true);
 
   // Filtros del catálogo
-  const [itemTypeTab, setItemTypeTab] = useState<'TODOS' | 'PLATILLOS' | 'BEBIDAS'>('TODOS');
+  const [itemTypeTab, setItemTypeTab] = useState<'TODOS' | 'PLATILLOS' | 'PORCIONES' | 'BEBIDAS'>('TODOS');
   const [selectedCategory, setSelectedCategory] = useState<string>('TODAS');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -121,13 +121,22 @@ export function WaitressOrderView({
     }
   }, [activeTab, onlyMine, currentUser]);
 
+  const isPortion = (cat: string) => {
+    const c = (cat || '').toLowerCase();
+    return c.includes('porcion') || c.includes('adicional');
+  };
+
   // Lista unificada de categorías
   const categories = useMemo(() => {
     const cats = new Set<string>();
-    if (itemTypeTab === 'TODOS' || itemTypeTab === 'PLATILLOS') {
+    if (itemTypeTab === 'TODOS') {
       menuItems.forEach(m => cats.add(m.category));
-    }
-    if (itemTypeTab === 'TODOS' || itemTypeTab === 'BEBIDAS') {
+      products.forEach(p => cats.add(p.category));
+    } else if (itemTypeTab === 'PLATILLOS') {
+      menuItems.filter(m => !isPortion(m.category)).forEach(m => cats.add(m.category));
+    } else if (itemTypeTab === 'PORCIONES') {
+      menuItems.filter(m => isPortion(m.category)).forEach(m => cats.add(m.category));
+    } else if (itemTypeTab === 'BEBIDAS') {
       products.forEach(p => cats.add(p.category));
     }
     return Array.from(cats);
@@ -293,6 +302,8 @@ export function WaitressOrderView({
     if (itemTypeTab === 'BEBIDAS') return [];
     return menuItems.filter(dish => {
       if (!dish.available) return false;
+      if (itemTypeTab === 'PORCIONES' && !isPortion(dish.category)) return false;
+      if (itemTypeTab === 'PLATILLOS' && isPortion(dish.category)) return false;
       if (selectedCategory !== 'TODAS' && dish.category !== selectedCategory) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -303,7 +314,7 @@ export function WaitressOrderView({
   }, [menuItems, itemTypeTab, selectedCategory, searchQuery]);
 
   const filteredProducts = useMemo(() => {
-    if (itemTypeTab === 'PLATILLOS') return [];
+    if (itemTypeTab === 'PLATILLOS' || itemTypeTab === 'PORCIONES') return [];
     return products.filter(prod => {
       if (selectedCategory !== 'TODAS' && prod.category !== selectedCategory) return false;
       if (searchQuery.trim()) {
@@ -384,11 +395,9 @@ export function WaitressOrderView({
 
       {/* VISTA 1: TOMAR COMANDA */}
       {activeTab === 'CREAR' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* LADO IZQUIERDO: SELECCIÓN DE MESA Y CATÁLOGO DE MENÚ (7 cols en desktop) */}
-          <div className="lg:col-span-7 space-y-5">
-            {/* 1. Selector de Tipo y Mesa */}
-            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-4">
+        <div className="space-y-6">
+          {/* 1. Selector de Tipo y Mesa (Ancho completo arriba) */}
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
                   1. Destino del Pedido
@@ -502,332 +511,417 @@ export function WaitressOrderView({
               )}
             </div>
 
-            {/* 2. Filtros y Búsqueda del Menú */}
-            <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
-                {/* Tipo: Platillos vs Bebidas */}
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl">
-                  <button
-                    onClick={() => { setItemTypeTab('TODOS'); setSelectedCategory('TODAS'); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      itemTypeTab === 'TODOS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-                    }`}
-                  >
-                    Todo
-                  </button>
-                  <button
-                    onClick={() => { setItemTypeTab('PLATILLOS'); setSelectedCategory('TODAS'); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${
-                      itemTypeTab === 'PLATILLOS' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500'
-                    }`}
-                  >
-                    <UtensilsCrossed className="w-3.5 h-3.5" /> Platillos
-                  </button>
-                  <button
-                    onClick={() => { setItemTypeTab('BEBIDAS'); setSelectedCategory('TODAS'); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${
-                      itemTypeTab === 'BEBIDAS' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'
-                    }`}
-                  >
-                    <Wine className="w-3.5 h-3.5" /> Bebidas
-                  </button>
-                </div>
+          {/* Contenedor responsivo: En móvil el Resumen va ARRIBA y la lista DEBAJO. En desktop van lado a lado */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* RESUMEN DE LA COMANDA / VENTA ACTUAL */}
+            {/* Móvil: order-1 (aparece inmediatamente sobre la lista) */}
+            {/* Desktop: order-2 lg:col-span-5 (columna derecha fija) */}
+            <div id="cart-summary" className="order-1 lg:order-2 lg:col-span-5">
+              <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-lg lg:sticky lg:top-24 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                      <ShoppingBag className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900">
+                        {orderType === 'MESA' 
+                          ? `${selectedTable} • ${customDinerName.trim() || subAccount}` 
+                          : '🥡 Para Llevar'}
+                      </h3>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        {totalItemsCount} {totalItemsCount === 1 ? 'producto' : 'productos'} en comanda actual
+                      </p>
+                    </div>
+                  </div>
 
-                {/* Buscador rápido */}
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Buscar plato o bebida..."
-                    className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      <X className="w-3.5 h-3.5" />
+                  {cart.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCart([])}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold"
+                      title="Vaciar comanda"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Vaciar</span>
                     </button>
                   )}
                 </div>
-              </div>
 
-              {/* Categorías pill y botón de Admin para agregar platos */}
-              <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
-                <div className="flex items-center gap-1.5 shrink-0">
+                {/* Lista de Ítems en Carrito */}
+                <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                  {cart.length === 0 ? (
+                    <div className="py-4 px-3 text-center rounded-2xl bg-slate-50 border border-dashed border-slate-200">
+                      <p className="text-xs font-black text-slate-600">Comanda vacía</p>
+                      <p className="text-[11px] text-slate-400">
+                        Toca los platillos o porciones de la lista de abajo para agregarlos
+                      </p>
+                    </div>
+                  ) : (
+                    cart.map(item => (
+                      <div
+                        key={item.tempId}
+                        className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-xs font-black text-slate-900 truncate">{item.name}</h4>
+                            <span className="text-[11px] font-bold text-slate-500">
+                              ${(item.quantity * item.unitPrice).toLocaleString('es-CO')}
+                              <span className="text-[10px] text-slate-400 ml-1">
+                                (${item.unitPrice.toLocaleString('es-CO')} c/u)
+                              </span>
+                            </span>
+                          </div>
+
+                          {/* Controles de cantidad */}
+                          <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQty(item.tempId, -1)}
+                              className="w-6 h-6 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center font-bold"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="w-6 text-center text-xs font-black text-slate-900">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQty(item.tempId, 1)}
+                              className="w-6 h-6 rounded-lg text-purple-700 hover:bg-purple-50 flex items-center justify-center font-bold"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Nota u Observación específica (ej: Sin cebolla) */}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/50">
+                          {item.notes ? (
+                            <div className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 font-bold flex-1 truncate">
+                              ✏️ Nota: {item.notes}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">Sin observaciones</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openNoteModal(item)}
+                            className="text-[10px] font-bold text-purple-700 hover:underline flex items-center gap-1 shrink-0"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            {item.notes ? 'Cambiar nota' : '+ Agregar nota'}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Notas generales de la comanda */}
+                {cart.length > 0 && (
+                  <div className="pt-2">
+                    <input
+                      type="text"
+                      value={generalNotes}
+                      onChange={e => setGeneralNotes(e.target.value)}
+                      placeholder="Nota general para cocina (ej: Entregar todo junto)..."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                    />
+                  </div>
+                )}
+
+                {/* Subtotal y Botón Enviar */}
+                <div className="pt-3 border-t border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500">Total Comanda:</span>
+                    <span className="text-lg font-black text-slate-900">
+                      ${cartSubtotal.toLocaleString('es-CO')}
+                    </span>
+                  </div>
+
                   <button
-                    onClick={() => setSelectedCategory('TODAS')}
-                    className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
-                      selectedCategory === 'TODAS'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                    type="button"
+                    disabled={cart.length === 0 || isSending}
+                    onClick={handleSendOrder}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 active:scale-98 transition-all"
                   >
-                    Todas las categorías
+                    {isSending ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Enviando a Cocina...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>
+                          {cart.length === 0 
+                            ? 'Agrega productos abajo para enviar' 
+                            : `Enviar Pedido a Cocina (${totalItemsCount})`}
+                        </span>
+                      </>
+                    )}
                   </button>
-                  {categories.map(cat => (
+                </div>
+              </div>
+            </div>
+
+            {/* CATÁLOGO DE PLATILLOS, PORCIONES Y BEBIDAS */}
+            {/* Móvil: order-2 (aparece DEBAJO del resumen de comanda actual) */}
+            {/* Desktop: order-1 lg:col-span-7 (columna izquierda) */}
+            <div className="order-2 lg:order-1 lg:col-span-7 space-y-5">
+              {/* 2. Filtros y Búsqueda del Menú */}
+              <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+                  {/* Tipo: Todo vs Platillos vs Porciones vs Bebidas */}
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl overflow-x-auto scrollbar-none">
                     <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
+                      onClick={() => { setItemTypeTab('TODOS'); setSelectedCategory('TODAS'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all whitespace-nowrap ${
+                        itemTypeTab === 'TODOS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      Todo
+                    </button>
+                    <button
+                      onClick={() => { setItemTypeTab('PLATILLOS'); setSelectedCategory('TODAS'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 whitespace-nowrap ${
+                        itemTypeTab === 'PLATILLOS' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      <UtensilsCrossed className="w-3.5 h-3.5" /> Platillos
+                    </button>
+                    <button
+                      onClick={() => { setItemTypeTab('PORCIONES'); setSelectedCategory('TODAS'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 whitespace-nowrap ${
+                        itemTypeTab === 'PORCIONES' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      <span>🍚 Porciones</span>
+                    </button>
+                    <button
+                      onClick={() => { setItemTypeTab('BEBIDAS'); setSelectedCategory('TODAS'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 whitespace-nowrap ${
+                        itemTypeTab === 'BEBIDAS' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      <Wine className="w-3.5 h-3.5" /> Bebidas
+                    </button>
+                  </div>
+
+                  {/* Buscador rápido */}
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Buscar plato, porción o bebida..."
+                      className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Categorías pill y botón de Admin para agregar platos/porciones */}
+                <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => setSelectedCategory('TODAS')}
                       className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
-                        selectedCategory === cat
+                        selectedCategory === 'TODAS'
                           ? 'bg-purple-600 text-white'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      {cat}
+                      Todas las categorías
                     </button>
-                  ))}
-                </div>
+                    {categories.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
+                          selectedCategory === cat
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
 
-                {currentUser?.role === 'ADMIN' && onOpenMenuManagement && (
-                  <button
-                    type="button"
-                    onClick={onOpenMenuManagement}
-                    className="px-3 py-1 rounded-xl text-[11px] font-black bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200 flex items-center gap-1 transition-all whitespace-nowrap shrink-0 shadow-xs"
-                    title="Crear o editar platillos y porciones del restaurante"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>+ Plato / Porción</span>
-                  </button>
+                  {currentUser?.role === 'ADMIN' && onOpenMenuManagement && (
+                    <button
+                      type="button"
+                      onClick={onOpenMenuManagement}
+                      className="px-3 py-1 rounded-xl text-[11px] font-black bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200 flex items-center gap-1 transition-all whitespace-nowrap shrink-0 shadow-xs"
+                      title="Crear o editar platillos y porciones del restaurante"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      <span>+ Plato / Porción</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Cuadrícula de Platillos y Bebidas */}
+              <div className="space-y-4">
+                {/* Sección PLATILLOS Y PORCIONES */}
+                {filteredDishes.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-2 flex items-center gap-1.5">
+                      <UtensilsCrossed className="w-3.5 h-3.5 text-purple-600" />
+                      {itemTypeTab === 'PORCIONES' 
+                        ? `🍚 Porciones & Adicionales (${filteredDishes.length})`
+                        : itemTypeTab === 'PLATILLOS'
+                        ? `🍽️ Platillos de Cocina (${filteredDishes.length})`
+                        : `Platillos & Porciones (${filteredDishes.length})`}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {filteredDishes.map(dish => {
+                        const isPort = isPortion(dish.category);
+                        return (
+                          <div
+                            key={dish.id}
+                            onClick={() => handleAddDish(dish)}
+                            className={`p-3.5 rounded-2xl border cursor-pointer transition-all active:scale-[0.98] flex items-center justify-between gap-3 ${
+                              isPort
+                                ? 'bg-amber-50/40 border-amber-200/90 hover:border-amber-400 hover:shadow-md'
+                                : 'bg-white border-slate-200 hover:border-purple-300 hover:shadow-md'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-[10px] font-black uppercase tracking-wider block ${
+                                isPort ? 'text-amber-700' : 'text-purple-600'
+                              }`}>
+                                {isPort ? `🍚 ${dish.category}` : dish.category}
+                              </span>
+                              <h4 className="text-sm font-bold text-slate-900 truncate">{dish.name}</h4>
+                              {dish.description && (
+                                <p className="text-[11px] text-slate-500 line-clamp-1">{dish.description}</p>
+                              )}
+                              <span className="text-xs font-black text-slate-900 mt-1 block">
+                                ${dish.price.toLocaleString('es-CO')}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 font-bold ${
+                                isPort
+                                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-600 hover:text-white'
+                                  : 'bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white'
+                              }`}
+                            >
+                              <Plus className="w-5 h-5 stroke-[2.5]" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sección BEBIDAS DE BODEGA */}
+                {filteredProducts.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-2 flex items-center gap-1.5">
+                      <Wine className="w-3.5 h-3.5 text-emerald-600" />
+                      Bebidas de Bodega ({filteredProducts.length})
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {filteredProducts.map(prod => (
+                        <div
+                          key={prod.id}
+                          onClick={() => handleAddProduct(prod)}
+                          className="bg-white p-3.5 rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-between gap-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block">
+                                {prod.category}
+                              </span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
+                                prod.stock <= prod.minStock ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                Stock: {prod.stock}
+                              </span>
+                            </div>
+                            <h4 className="text-sm font-bold text-slate-900 truncate">{prod.name}</h4>
+                            <span className="text-xs font-black text-slate-900 mt-1 block">
+                              ${prod.salePrice.toLocaleString('es-CO')}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white flex items-center justify-center transition-all shrink-0 font-bold"
+                          >
+                            <Plus className="w-5 h-5 stroke-[2.5]" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {filteredDishes.length === 0 && filteredProducts.length === 0 && (
+                  <div className="p-8 text-center bg-white rounded-3xl border border-slate-200">
+                    <UtensilsCrossed className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs font-bold text-slate-500">No hay productos que coincidan con la búsqueda</p>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* 3. Cuadrícula de Platillos y Bebidas */}
-            <div className="space-y-4">
-              {/* Sección PLATILLOS */}
-              {filteredDishes.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-2 flex items-center gap-1.5">
-                    <UtensilsCrossed className="w-3.5 h-3.5 text-purple-600" />
-                    Platillos de Cocina ({filteredDishes.length})
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {filteredDishes.map(dish => (
-                      <div
-                        key={dish.id}
-                        onClick={() => handleAddDish(dish)}
-                        className="bg-white p-3.5 rounded-2xl border border-slate-200 hover:border-purple-300 hover:shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-between gap-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-purple-600 block">
-                            {dish.category}
-                          </span>
-                          <h4 className="text-sm font-bold text-slate-900 truncate">{dish.name}</h4>
-                          {dish.description && (
-                            <p className="text-[11px] text-slate-500 line-clamp-1">{dish.description}</p>
-                          )}
-                          <span className="text-xs font-black text-slate-900 mt-1 block">
-                            ${dish.price.toLocaleString('es-CO')}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white flex items-center justify-center transition-all shrink-0 font-bold"
-                        >
-                          <Plus className="w-5 h-5 stroke-[2.5]" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Sección BEBIDAS DE BODEGA */}
-              {filteredProducts.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-black uppercase text-slate-400 tracking-wider mb-2 flex items-center gap-1.5">
-                    <Wine className="w-3.5 h-3.5 text-emerald-600" />
-                    Bebidas de Bodega ({filteredProducts.length})
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {filteredProducts.map(prod => (
-                      <div
-                        key={prod.id}
-                        onClick={() => handleAddProduct(prod)}
-                        className="bg-white p-3.5 rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-between gap-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block">
-                              {prod.category}
-                            </span>
-                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
-                              prod.stock <= prod.minStock ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              Stock: {prod.stock}
-                            </span>
-                          </div>
-                          <h4 className="text-sm font-bold text-slate-900 truncate">{prod.name}</h4>
-                          <span className="text-xs font-black text-slate-900 mt-1 block">
-                            ${prod.salePrice.toLocaleString('es-CO')}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white flex items-center justify-center transition-all shrink-0 font-bold"
-                        >
-                          <Plus className="w-5 h-5 stroke-[2.5]" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {filteredDishes.length === 0 && filteredProducts.length === 0 && (
-                <div className="p-8 text-center bg-white rounded-3xl border border-slate-200">
-                  <UtensilsCrossed className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-slate-500">No hay productos que coincidan con la búsqueda</p>
-                </div>
-              )}
-            </div>
           </div>
 
-          {/* LADO DERECHO: RESUMEN DE LA COMANDA / CARRITO (5 cols en desktop) */}
-          <div className="lg:col-span-5">
-            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-lg sticky top-24 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                    <ShoppingBag className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900">
-                      {orderType === 'MESA' 
-                        ? `${selectedTable} • ${customDinerName.trim() || subAccount}` 
-                        : orderType === 'PARA_LLEVAR' ? '🥡 Para Llevar' : '🛵 Domicilio'}
-                    </h3>
-                    <p className="text-[10px] text-slate-500 font-medium">
-                      {totalItemsCount} {totalItemsCount === 1 ? 'producto' : 'productos'} en comanda
-                    </p>
-                  </div>
-                </div>
-
-                {cart.length > 0 && (
-                  <button
-                    onClick={() => setCart([])}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
-                    title="Vaciar comanda"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Lista de Ítems en Carrito */}
-              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                {cart.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400">
-                    <ShoppingBag className="w-12 h-12 stroke-[1.5] mx-auto mb-2 opacity-50" />
-                    <p className="text-xs font-bold text-slate-500">Comanda vacía</p>
-                    <p className="text-[11px] text-slate-400">Toca los platillos o bebidas a la izquierda para agregarlos</p>
-                  </div>
-                ) : (
-                  cart.map(item => (
-                    <div
-                      key={item.tempId}
-                      className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-xs font-black text-slate-900 truncate">{item.name}</h4>
-                          <span className="text-[11px] font-bold text-slate-500">
-                            ${(item.quantity * item.unitPrice).toLocaleString('es-CO')}
-                            <span className="text-[10px] text-slate-400 ml-1">
-                              (${item.unitPrice.toLocaleString('es-CO')} c/u)
-                            </span>
-                          </span>
-                        </div>
-
-                        {/* Controles de cantidad */}
-                        <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-slate-200">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQty(item.tempId, -1)}
-                            className="w-6 h-6 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center font-bold"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="w-6 text-center text-xs font-black text-slate-900">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQty(item.tempId, 1)}
-                            className="w-6 h-6 rounded-lg text-purple-700 hover:bg-purple-50 flex items-center justify-center font-bold"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Nota u Observación específica (ej: Sin cebolla) */}
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/50">
-                        {item.notes ? (
-                          <div className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 font-bold flex-1 truncate">
-                            ✏️ Nota: {item.notes}
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">Sin observaciones</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => openNoteModal(item)}
-                          className="text-[10px] font-bold text-purple-700 hover:underline flex items-center gap-1 shrink-0"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                          {item.notes ? 'Cambiar nota' : '+ Agregar nota'}
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Notas generales de la comanda */}
-              {cart.length > 0 && (
-                <div className="pt-2">
-                  <input
-                    type="text"
-                    value={generalNotes}
-                    onChange={e => setGeneralNotes(e.target.value)}
-                    placeholder="Nota general para cocina (ej: Entregar todo junto)..."
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              )}
-
-              {/* Total y Botón de Enviar a Cocina */}
-              <div className="pt-3 border-t border-slate-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase text-slate-400">Total a Pagar:</span>
-                  <span className="text-lg font-black text-slate-900">
-                    ${cartSubtotal.toLocaleString('es-CO')}
+          {/* BARRA FLOTANTE MÓVIL: Atajo cuando se desplaza abajo en la lista */}
+          {cart.length > 0 && (
+            <div className="lg:hidden fixed bottom-4 left-3 right-3 z-40 animate-slide-up">
+              <div className="bg-slate-900/95 backdrop-blur-md text-white p-3 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('cart-summary');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="flex items-center gap-2 text-left flex-1 min-w-0"
+                >
+                  <span className="w-7 h-7 rounded-lg bg-purple-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                    {totalItemsCount}
                   </span>
-                </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-black block truncate">
+                      ${cartSubtotal.toLocaleString('es-CO')}
+                    </span>
+                    <span className="text-[10px] text-purple-300 font-bold block truncate">
+                      Ver resumen arriba ⬆️
+                    </span>
+                  </div>
+                </button>
 
                 <button
                   type="button"
-                  disabled={cart.length === 0 || isSending}
+                  disabled={isSending}
                   onClick={handleSendOrder}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 active:scale-98 transition-all"
+                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white text-xs font-black flex items-center gap-1.5 shadow-lg shadow-purple-600/40 shrink-0 disabled:opacity-50"
                 >
                   {isSending ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Enviando a Cocina...</span>
-                    </>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>Enviar Pedido a Cocina ({totalItemsCount})</span>
-                    </>
+                    <Send className="w-3.5 h-3.5" />
                   )}
+                  <span>Enviar a Cocina</span>
                 </button>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
