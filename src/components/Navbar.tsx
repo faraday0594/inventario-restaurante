@@ -3,7 +3,7 @@
 import React from 'react';
 import { 
   Wine, Camera, Plus, History, Search, Sparkles, User as UserIcon, 
-  Shield, UtensilsCrossed, ChefHat, Calendar, Settings, DollarSign
+  Shield, UtensilsCrossed, ChefHat, Calendar, Settings, DollarSign, Database
 } from 'lucide-react';
 import { User } from '@/lib/types';
 
@@ -25,6 +25,8 @@ interface NavbarProps {
   onOpenLogin: () => void;
   onOpenMenuManagement: () => void;
   onOpenUsersManagement: () => void;
+  onOpenDbStatus?: () => void;
+  dbConnected?: boolean;
 }
 
 export function Navbar({
@@ -42,7 +44,9 @@ export function Navbar({
   onOpenHistory,
   onOpenLogin,
   onOpenMenuManagement,
-  onOpenUsersManagement
+  onOpenUsersManagement,
+  onOpenDbStatus,
+  dbConnected
 }: NavbarProps) {
   const isAdmin = currentUser?.role === 'ADMIN';
   const isCocina = currentUser?.role === 'COCINA';
@@ -89,6 +93,25 @@ export function Navbar({
               >
                 <UserIcon className="w-4 h-4 text-indigo-600" />
                 <span className="hidden sm:inline">Personal & PINs</span>
+              </button>
+            )}
+
+            {/* Si es ADMIN: Estado de Base de Datos */}
+            {isAdmin && onOpenDbStatus && (
+              <button
+                onClick={onOpenDbStatus}
+                className={`p-2 sm:px-3 sm:py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors border ${
+                  dbConnected
+                    ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200/80'
+                    : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-300'
+                }`}
+                title="Ver estado de conexión con la Base de Datos PostgreSQL"
+              >
+                <Database className={`w-4 h-4 ${dbConnected ? 'text-emerald-600' : 'text-amber-600'}`} />
+                <span className="hidden sm:inline">
+                  {dbConnected ? 'DB Conectada' : 'Verificar DB'}
+                </span>
+                <span className={`w-2 h-2 rounded-full ${dbConnected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
               </button>
             )}
 

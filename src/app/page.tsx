@@ -16,6 +16,7 @@ import { KitchenOrdersView } from '@/components/KitchenOrdersView';
 import { OrdersHistoryView } from '@/components/OrdersHistoryView';
 import { MenuManagementModal } from '@/components/MenuManagementModal';
 import { UsersManagementModal } from '@/components/UsersManagementModal';
+import { DbStatusModal } from '@/components/DbStatusModal';
 import { 
   Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert,
   Bell, X, Flame
@@ -46,6 +47,8 @@ export default function HomePage() {
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
   const [isMenuManagementOpen, setIsMenuManagementOpen] = useState(false);
   const [isUsersManagementOpen, setIsUsersManagementOpen] = useState(false);
+  const [isDbStatusOpen, setIsDbStatusOpen] = useState(false);
+  const [isDbConnected, setIsDbConnected] = useState(false);
   const [productToAdjust, setProductToAdjust] = useState<Product | null>(null);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
@@ -211,11 +214,22 @@ export default function HomePage() {
       const prodsData = await prodsRes.json();
       if (prodsData.success) setProducts(prodsData.products);
 
-      // Solo si es ADMIN, cargar historial de movimientos de bodega
+      // Solo si es ADMIN, cargar historial de movimientos de bodega y verificar DB
       if (currentUser?.role === 'ADMIN') {
-        const movsRes = await fetch(`/api/movements?userRole=ADMIN`);
-        const movsData = await movsRes.json();
-        if (movsData.success) setMovements(movsData.movements);
+        const [movsRes, dbRes] = await Promise.allSettled([
+          fetch(`/api/movements?userRole=ADMIN`),
+          fetch('/api/db-status', { cache: 'no-store' })
+        ]);
+
+        if (movsRes.status === 'fulfilled') {
+          const movsData = await movsRes.value.json();
+          if (movsData.success) setMovements(movsData.movements);
+        }
+
+        if (dbRes.status === 'fulfilled') {
+          const dbData = await dbRes.value.json();
+          setIsDbConnected(Boolean(dbData.connected));
+        }
       } else {
         setMovements([]);
       }
@@ -366,9 +380,11 @@ export default function HomePage() {
       alert('Solo el Administrador tiene permiso para eliminar productos del inventario.');
       return;
     }
-    if (!confirm('¿Seguro que deseas eliminar esta bebida del inventario?')) return;
     try {
-      const res = await fetch(`/api/products?id=${id}&userRole=${currentUser.role}`, { method: 'DELETE' });
+      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}&userRole=${encodeURIComponent(currentUser.role)}`, { 
+        method: 'DELETE',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Error al eliminar');
@@ -376,8 +392,9 @@ export default function HomePage() {
       setProducts(prev => prev.filter(p => p.id !== id));
       setIsNewProductOpen(false);
       setProductToEdit(null);
+      await fetchData();
     } catch (err: any) {
-      alert(err.message);
+      alert(`No se pudo eliminar el producto: ${err.message}`);
     }
   };
 
@@ -403,6 +420,8 @@ export default function HomePage() {
         onOpenLogin={() => setIsLoginOpen(true)}
         onOpenMenuManagement={() => setIsMenuManagementOpen(true)}
         onOpenUsersManagement={() => setIsUsersManagementOpen(true)}
+        onOpenDbStatus={() => setIsDbStatusOpen(true)}
+        dbConnected={isDbConnected}
       />
 
       {/* NOTIFICACIÓN FLOTANTE EN VIVO TIPO CELULAR / ALARMA (NUEVO PEDIDO O PLATO LISTO) */}
@@ -662,6 +681,13 @@ export default function HomePage() {
         onClose={() => setIsUsersManagementOpen(false)}
         currentUser={currentUser}
         onUsersUpdated={fetchData}
+      />
+
+      {/* Modal de Diagnóstico y Estado de Base de Datos */}
+      <DbStatusModal
+        isOpen={isDbStatusOpen}
+        onClose={() => setIsDbStatusOpen(false)}
+        onStatusChange={setIsDbConnected}
       />
 
       {/* Modal de Inicio de Sesión / Cambio de Usuario */}

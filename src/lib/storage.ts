@@ -203,12 +203,24 @@ function getPgPool(): Pool | null {
     process.env.POSTGRES_URL_NON_POOLING ||
     process.env.STORAGE_URL_NON_POOLING;
 
-  if (!dbUrl) return null;
+  if (!dbUrl || typeof dbUrl !== 'string' || dbUrl.trim() === '' || dbUrl === 'undefined') {
+    return null;
+  }
 
   if (!pgPool) {
+    const cleanUrl = dbUrl.trim();
+    const isLocal = cleanUrl.includes('localhost') || cleanUrl.includes('127.0.0.1');
     pgPool = new Pool({
-      connectionString: dbUrl,
-      ssl: { rejectUnauthorized: false }
+      connectionString: cleanUrl,
+      ssl: isLocal ? false : { rejectUnauthorized: false },
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 10000,
+      max: 5
+    });
+
+    pgPool.on('error', (err) => {
+      console.error('Error imprevisto en cliente inactivo de PostgreSQL:', err);
+      pgPool = null;
     });
   }
   return pgPool;
@@ -232,14 +244,7 @@ function normalizeData(data: InventoryData): InventoryData {
   if (!data.products || !Array.isArray(data.products)) data.products = [];
   if (!data.movements || !Array.isArray(data.movements)) data.movements = [];
   if (!data.menuItems || !Array.isArray(data.menuItems) || data.menuItems.length === 0) {
-    data.menuItems = INITIAL_MENU_ITEMS;
-  } else {
-    // Asegurar que las porciones de INITIAL_MENU_ITEMS estén presentes
-    for (const initM of INITIAL_MENU_ITEMS) {
-      if (!data.menuItems.some(m => m.id === initM.id || m.name.toLowerCase() === initM.name.toLowerCase())) {
-        data.menuItems.push(initM);
-      }
-    }
+    data.menuItems = [...INITIAL_MENU_ITEMS];
   }
   if (!data.orders || !Array.isArray(data.orders)) data.orders = [];
   return data;
@@ -300,7 +305,7 @@ async function ensureData(): Promise<InventoryData> {
         );
       `);
       const res = await pool.query(`SELECT data FROM inventory_data WHERE id = 'main' LIMIT 1;`);
-      if (res.rows.length > 0) {
+      if (res.rows.length > 0 && res.rows[0].data) {
         const cloudData = res.rows[0].data as InventoryData;
         return normalizeData(cloudData);
       }
@@ -308,7 +313,7 @@ async function ensureData(): Promise<InventoryData> {
       // Si la tabla en la nube está vacía, sembrar con los datos actuales
       const localData = getLocalData();
       await pool.query(
-        `INSERT INTO inventory_data (id, data) VALUES ('main', $1) ON CONFLICT (id) DO NOTHING;`,
+        `INSERT INTO inventory_data (id, data, updated_at) VALUES ('main', $1, NOW()) ON CONFLICT (id) DO NOTHING;`,
         [JSON.stringify(localData)]
       );
       return localData;
@@ -332,6 +337,7 @@ async function saveData(data: InventoryData): Promise<void> {
       return;
     } catch (err) {
       console.error('Error guardando en PostgreSQL:', err);
+      throw new Error(`Error al persistir en base de datos PostgreSQL: ${(err as Error).message}`);
     }
   }
 
@@ -569,12 +575,16 @@ export async function deleteProduct(productId: string, user?: { role: UserRole }
   }
 
   const data = await ensureData();
+  const cleanId = String(productId).trim();
   const initialLength = data.products.length;
-  data.products = data.products.filter(p => p.id !== productId);
+  data.products = data.products.filter(p => String(p.id).trim() !== cleanId);
+  
   if (data.products.length !== initialLength) {
+    console.log(`[Storage] Producto eliminado: ${cleanId}. Total restante: ${data.products.length}`);
     await saveData(data);
     return true;
   }
+  console.warn(`[Storage] Producto ${cleanId} no encontrado para eliminar. Total productos: ${initialLength}`);
   return false;
 }
 
@@ -959,3 +969,160 @@ export async function getDailyOrdersSummary(dateStr?: string): Promise<{
     waiterStats
   };
 }
+
+// ==========================================
+// DIAGNÓSTICO Y ESTADO DE BASE DE DATOS
+// ==========================================
+
+export interface DbStatusInfo {
+  connected: boolean;
+  configured: boolean;
+  storageType: 'postgres' | 'local_file' | 'ephemeral_tmp';
+  isServerless: boolean;
+  envVarUsed: string | null;
+  maskedHost: string | null;
+  databaseName: string | null;
+  tablesFound: boolean;
+  recordCount: {
+    products: number;
+    menuItems: number;
+    users: number;
+    orders: number;
+    movements: number;
+  };
+  serverTime?: string;
+  error?: string;
+  warning?: string;
+}
+
+export async function checkDbStatus(): Promise<DbStatusInfo> {
+  const envVarKeys = [
+    'POSTGRES_URL',
+    'STORAGE_URL',
+    'STORAGE_POSTGRES_URL',
+    'DATABASE_URL',
+    'POSTGRES_PRISMA_URL',
+    'POSTGRES_URL_NON_POOLING',
+    'STORAGE_URL_NON_POOLING'
+  ];
+
+  let foundKey: string | null = null;
+  let dbUrl: string | null = null;
+
+  for (const k of envVarKeys) {
+    const val = process.env[k];
+    if (val && typeof val === 'string' && val.trim() !== '' && val !== 'undefined') {
+      foundKey = k;
+      dbUrl = val.trim();
+      break;
+    }
+  }
+
+  // Si no hay variable configurada
+  if (!dbUrl || !foundKey) {
+    const local = getLocalData();
+    return {
+      connected: false,
+      configured: false,
+      storageType: IS_SERVERLESS ? 'ephemeral_tmp' : 'local_file',
+      isServerless: IS_SERVERLESS,
+      envVarUsed: null,
+      maskedHost: null,
+      databaseName: null,
+      tablesFound: false,
+      recordCount: {
+        products: local.products?.length || 0,
+        menuItems: local.menuItems?.length || 0,
+        users: local.users?.length || 0,
+        orders: local.orders?.length || 0,
+        movements: local.movements?.length || 0,
+      },
+      warning: IS_SERVERLESS
+        ? '⚠️ No hay ninguna base de datos PostgreSQL conectada (POSTGRES_URL no definida). En Vercel los datos se guardan en /tmp y se reinician en cada despliegue o reinicio del contenedor. Debes conectar PostgreSQL (Neon o Supabase) en las Variables de Entorno de Vercel.'
+        : 'Operando con archivo local (data/inventory.json). Para producción en la nube (Vercel), debes conectar PostgreSQL.'
+    };
+  }
+
+  // Enmascarar host para seguridad
+  let maskedHost = 'desconocido';
+  try {
+    const parsedUrl = new URL(dbUrl);
+    maskedHost = `${parsedUrl.protocol}//${parsedUrl.username ? parsedUrl.username + '@' : ''}${parsedUrl.host}${parsedUrl.pathname}`;
+  } catch {
+    maskedHost = 'postgres://***';
+  }
+
+  const pool = getPgPool();
+  if (!pool) {
+    return {
+      connected: false,
+      configured: true,
+      storageType: 'postgres',
+      isServerless: IS_SERVERLESS,
+      envVarUsed: foundKey,
+      maskedHost,
+      databaseName: null,
+      tablesFound: false,
+      recordCount: { products: 0, menuItems: 0, users: 0, orders: 0, movements: 0 },
+      error: 'No se pudo instanciar el cliente Pool de PostgreSQL.'
+    };
+  }
+
+  try {
+    const testRes = await pool.query('SELECT NOW() as now, current_database() as db_name;');
+    const serverTime = testRes.rows[0]?.now;
+    const dbName = testRes.rows[0]?.db_name;
+
+    // Verificar si la tabla inventory_data existe
+    const tableRes = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'inventory_data'
+      ) as exists;
+    `);
+    const tableExists = Boolean(tableRes.rows[0]?.exists);
+
+    let counts = { products: 0, menuItems: 0, users: 0, orders: 0, movements: 0 };
+    if (tableExists) {
+      const dataRes = await pool.query(`SELECT data FROM inventory_data WHERE id = 'main' LIMIT 1;`);
+      if (dataRes.rows.length > 0 && dataRes.rows[0]?.data) {
+        const d = dataRes.rows[0].data as InventoryData;
+        counts = {
+          products: d.products?.length || 0,
+          menuItems: d.menuItems?.length || 0,
+          users: d.users?.length || 0,
+          orders: d.orders?.length || 0,
+          movements: d.movements?.length || 0,
+        };
+      }
+    }
+
+    return {
+      connected: true,
+      configured: true,
+      storageType: 'postgres',
+      isServerless: IS_SERVERLESS,
+      envVarUsed: foundKey,
+      maskedHost,
+      databaseName: dbName,
+      tablesFound: tableExists,
+      recordCount: counts,
+      serverTime: serverTime ? String(serverTime) : undefined
+    };
+  } catch (err: any) {
+    return {
+      connected: false,
+      configured: true,
+      storageType: 'postgres',
+      isServerless: IS_SERVERLESS,
+      envVarUsed: foundKey,
+      maskedHost,
+      databaseName: null,
+      tablesFound: false,
+      recordCount: { products: 0, menuItems: 0, users: 0, orders: 0, movements: 0 },
+      error: `Error al conectar con PostgreSQL: ${err.message}`
+    };
+  }
+}
+

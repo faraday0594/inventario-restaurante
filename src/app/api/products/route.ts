@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getAllProducts, saveProduct, updateProductStock, deleteProduct } from '@/lib/storage';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const products = await getAllProducts();
-    return NextResponse.json({ success: true, products });
+    return NextResponse.json(
+      { success: true, products },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -74,8 +85,15 @@ export async function DELETE(request: Request) {
     }
 
     const deleted = await deleteProduct(id, { role: 'ADMIN' });
-    return NextResponse.json({ success: true, deleted });
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, error: `No se encontró el producto con ID "${id}" para eliminar.` }, 
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ success: true, deleted: true });
   } catch (error: any) {
+    console.error('Error al eliminar producto:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
