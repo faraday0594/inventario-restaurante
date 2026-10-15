@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Order, OrderStatus, User } from '@/lib/types';
-import { playKitchenChime, playTapSound } from '@/lib/soundUtils';
+import { playKitchenChime, playTapSound, speakAlert } from '@/lib/soundUtils';
+import { sendNativeNotification } from '@/lib/notificationService';
 import { 
   ChefHat, Volume2, VolumeX, Clock, Flame, CheckCircle2, 
-  AlertTriangle, RefreshCw, Check, ArrowRight, User as UserIcon, Calendar
+  AlertTriangle, RefreshCw, Check, ArrowRight, User as UserIcon, Calendar, BellRing
 } from 'lucide-react';
 
 interface KitchenOrdersViewProps {
@@ -20,9 +21,18 @@ export function KitchenOrdersView({ currentUser, onRefreshData }: KitchenOrdersV
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [now, setNow] = useState<number>(Date.now());
+  const [newOrderAlert, setNewOrderAlert] = useState<{ id: string; title: string; subtitle: string } | null>(null);
 
   // Ref para guardar los IDs de órdenes ya conocidas y hacer sonar campana solo con las nuevas
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
+
+  // Auto-ocultar alerta visual de pantalla completa tras 8 segundos
+  useEffect(() => {
+    if (newOrderAlert) {
+      const timer = setTimeout(() => setNewOrderAlert(null), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [newOrderAlert]);
 
   // Actualizar el reloj cada 10 segundos para los cronómetros
   useEffect(() => {
@@ -41,12 +51,35 @@ export function KitchenOrdersView({ currentUser, onRefreshData }: KitchenOrdersV
         const incomingOrders: Order[] = data.orders;
 
         // Comprobar si hay alguna orden nueva que no estuviera antes
-        if (!isFirstLoad && soundEnabled && audioUnlocked) {
-          const hasNew = incomingOrders.some(
+        if (!isFirstLoad) {
+          const newOrders = incomingOrders.filter(
             o => !knownOrderIdsRef.current.has(o.id) && o.status === 'PENDIENTE'
           );
-          if (hasNew) {
-            playKitchenChime();
+
+          if (newOrders.length > 0) {
+            const firstNew = newOrders[0];
+            const targetName = firstNew.type === 'MESA' ? (firstNew.tableNumber || 'Mesa') : '🥡 Para Llevar';
+            
+            // 1. Alarma sonora penetrante + vibración de celular
+            if (soundEnabled) {
+              playKitchenChime();
+              speakAlert(`¡Nuevo pedido en cocina! ${targetName}`);
+            }
+
+            // 2. Notificación nativa tipo celular (incluso con pantalla bloqueada o app minimizada)
+            sendNativeNotification('🚨 ¡NUEVO PEDIDO EN COCINA!', {
+              body: `${targetName} (${firstNew.subAccount || 'Cuenta'}) - Tomado por ${firstNew.waiterName || 'Mesera'}. ¡Preparar ahora!`,
+              tag: `new-order-${firstNew.id}`,
+              requireInteraction: true,
+              vibrate: [400, 200, 400, 200, 600]
+            });
+
+            // 3. Banner alarmista visual en pantalla
+            setNewOrderAlert({
+              id: firstNew.id,
+              title: `¡NUEVO PEDIDO: ${targetName.toUpperCase()}!`,
+              subtitle: `Tomado por ${firstNew.waiterName || 'Mesera'} • ${firstNew.items?.length || 0} ítems`
+            });
           }
         }
 
@@ -131,9 +164,41 @@ export function KitchenOrdersView({ currentUser, onRefreshData }: KitchenOrdersV
   const readyCount = orders.filter(o => o.status === 'LISTO').length;
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 animate-fade-in relative">
+      {/* ALERTA VISUAL ALARMISTA EN COCINA PARA NUEVO PEDIDO */}
+      {newOrderAlert && (
+        <div className="fixed top-20 left-4 right-4 sm:left-auto sm:right-6 sm:w-[420px] z-50 animate-alarm-pulse shadow-2xl">
+          <div className="bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 text-white p-4 rounded-3xl border-4 border-amber-300 shadow-rose-900/60 flex items-center justify-between gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+              <Flame className="w-7 h-7 text-amber-200 animate-bounce stroke-[2.5]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white text-rose-700 px-2 py-0.5 rounded-full shadow-sm">
+                  🚨 ¡NUEVA COMANDA EN COCINA!
+                </span>
+              </div>
+              <h4 className="text-base font-black mt-1 leading-snug tracking-tight text-white drop-shadow">
+                {newOrderAlert.title}
+              </h4>
+              <p className="text-xs text-rose-100 font-bold">
+                {newOrderAlert.subtitle}
+              </p>
+            </div>
+            <button
+              onClick={() => setNewOrderAlert(null)}
+              className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/20 transition-colors"
+              title="Cerrar alerta"
+            >
+              <Check className="w-5 h-5 stroke-[3]" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Cabecera de Cocina */}
       <div className="bg-slate-900 text-white rounded-3xl p-4 sm:p-6 shadow-xl mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 flex items-center justify-center font-black shadow-lg shadow-orange-500/20 shrink-0">
             <ChefHat className="w-7 h-7" />

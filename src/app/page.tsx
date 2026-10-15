@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Movement, MovementType, User } from '@/lib/types';
-import { playReadyOrderChime } from '@/lib/soundUtils';
+import { playReadyOrderChime, playKitchenChime, speakAlert, triggerVibration } from '@/lib/soundUtils';
+import { sendNativeNotification, initNotificationService } from '@/lib/notificationService';
 import { Navbar, ActiveView } from '@/components/Navbar';
 import { StockCard } from '@/components/StockCard';
 import { AdjustStockModal } from '@/components/AdjustStockModal';
@@ -17,7 +18,7 @@ import { MenuManagementModal } from '@/components/MenuManagementModal';
 import { UsersManagementModal } from '@/components/UsersManagementModal';
 import { 
   Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert,
-  Bell, X
+  Bell, X, Flame
 } from 'lucide-react';
 
 export default function HomePage() {
@@ -49,59 +50,114 @@ export default function HomePage() {
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
   // Notificación en vivo para meseras cuando la cocina saca un pedido LISTO
-  interface ReadyNotification {
+  interface OrderAlertItem {
     id: string;
+    type: 'READY' | 'NEW_ORDER';
     tableName: string;
     subAccount?: string;
     waiterName?: string;
     time: string;
   }
-  const [readyNotification, setReadyNotification] = useState<ReadyNotification | null>(null);
+  const [activeAlert, setActiveAlert] = useState<OrderAlertItem | null>(null);
   const knownReadyOrderIdsRef = useRef<Set<string>>(new Set());
+  const knownPendingOrderIdsRef = useRef<Set<string>>(new Set());
   const isFirstPollRef = useRef<boolean>(true);
 
-  // Auto-cerrar la notificación de plato listo tras 12 segundos
+  // Inicializar Service Worker de notificaciones al montar
   useEffect(() => {
-    if (readyNotification) {
+    initNotificationService();
+  }, []);
+
+  // Auto-cerrar la notificación tras 12 segundos
+  useEffect(() => {
+    if (activeAlert) {
       const timer = setTimeout(() => {
-        setReadyNotification(null);
+        setActiveAlert(null);
       }, 12000);
       return () => clearTimeout(timer);
     }
-  }, [readyNotification]);
+  }, [activeAlert]);
 
-  // Sondeo en segundo plano (cada 4 seg) para alertar a las Meseras y al Admin cuando un pedido está LISTO
+  // Sondeo en segundo plano (cada 4 seg) para alertar pedidos LISTOS y NUEVOS PEDIDOS
   useEffect(() => {
-    if (!currentUser || (currentUser.role !== 'MESERA' && currentUser.role !== 'ADMIN')) {
-      return;
-    }
+    if (!currentUser) return;
 
-    const checkReadyOrders = async () => {
+    const checkOrders = async () => {
       try {
         const res = await fetch('/api/orders?active=true');
         const data = await res.json();
         if (data.success && Array.isArray(data.orders)) {
           const readyOrders = data.orders.filter((o: any) => o.status === 'LISTO');
+          const pendingOrders = data.orders.filter((o: any) => o.status === 'PENDIENTE');
 
           if (isFirstPollRef.current) {
             readyOrders.forEach((o: any) => knownReadyOrderIdsRef.current.add(o.id));
+            pendingOrders.forEach((o: any) => knownPendingOrderIdsRef.current.add(o.id));
             isFirstPollRef.current = false;
             return;
           }
 
-          for (const order of readyOrders) {
-            if (!knownReadyOrderIdsRef.current.has(order.id)) {
-              knownReadyOrderIdsRef.current.add(order.id);
-              // Campanilla de servicio y banner flotante
-              playReadyOrderChime();
-              setReadyNotification({
-                id: order.id,
-                tableName: order.orderType === 'MESA' ? (order.tableName || 'Mesa') : '🥡 Para Llevar',
-                subAccount: order.subAccount,
-                waiterName: order.waiterName,
-                time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-              });
-              break;
+          // 1. Alerta cuando Cocina saca un pedido LISTO -> para Meseras y Admin
+          if (currentUser.role === 'MESERA' || currentUser.role === 'ADMIN') {
+            for (const order of readyOrders) {
+              if (!knownReadyOrderIdsRef.current.has(order.id)) {
+                knownReadyOrderIdsRef.current.add(order.id);
+                const tableStr = order.type === 'MESA' ? (order.tableNumber || 'Mesa') : '🥡 Para Llevar';
+                
+                // Alarma sonora potente + voz hablada + vibración
+                playReadyOrderChime();
+                speakAlert(`¡Atención! Pedido listo en cocina para ${tableStr}`);
+                
+                // Notificación nativa tipo celular (incluso con navegador en segundo plano)
+                sendNativeNotification('🔔 ¡PLATO LISTO PARA SERVIR!', {
+                  body: `${tableStr} (${order.subAccount || 'Cuenta'}) - Tomado por ${order.waiterName || 'Mesera'}. ¡Retirar de cocina!`,
+                  tag: `ready-order-${order.id}`,
+                  requireInteraction: true,
+                  vibrate: [300, 150, 300, 150, 600]
+                });
+
+                setActiveAlert({
+                  id: order.id,
+                  type: 'READY',
+                  tableName: tableStr,
+                  subAccount: order.subAccount,
+                  waiterName: order.waiterName,
+                  time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+                });
+                break;
+              }
+            }
+          }
+
+          // 2. Alerta cuando una Mesera hace un NUEVO PEDIDO -> para Cocina y Admin
+          if (currentUser.role === 'COCINA' || currentUser.role === 'ADMIN') {
+            for (const order of pendingOrders) {
+              if (!knownPendingOrderIdsRef.current.has(order.id)) {
+                knownPendingOrderIdsRef.current.add(order.id);
+                const tableStr = order.type === 'MESA' ? (order.tableNumber || 'Mesa') : '🥡 Para Llevar';
+
+                // Alarma sonora penetrante de cocina + voz hablada + vibración
+                playKitchenChime();
+                speakAlert(`¡Nueva comanda para ${tableStr}!`);
+
+                // Notificación nativa tipo celular
+                sendNativeNotification('🚨 ¡NUEVA COMANDA ENTRADA!', {
+                  body: `${tableStr} (${order.subAccount || 'Cuenta'}) - Tomado por ${order.waiterName || 'Mesera'}. ¡Empezar a cocinar!`,
+                  tag: `pending-order-${order.id}`,
+                  requireInteraction: true,
+                  vibrate: [400, 200, 400, 200, 600]
+                });
+
+                setActiveAlert({
+                  id: order.id,
+                  type: 'NEW_ORDER',
+                  tableName: tableStr,
+                  subAccount: order.subAccount,
+                  waiterName: order.waiterName,
+                  time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+                });
+                break;
+              }
             }
           }
         }
@@ -110,8 +166,8 @@ export default function HomePage() {
       }
     };
 
-    checkReadyOrders();
-    const interval = setInterval(checkReadyOrders, 4000);
+    checkOrders();
+    const interval = setInterval(checkOrders, 3500);
     return () => clearInterval(interval);
   }, [currentUser]);
 
@@ -349,35 +405,64 @@ export default function HomePage() {
         onOpenUsersManagement={() => setIsUsersManagementOpen(true)}
       />
 
-      {/* NOTIFICACIÓN FLOTANTE EN VIVO CUANDO COCINA PONE UN PEDIDO EN 'LISTO' (MESERAS Y ADMIN) */}
-      {readyNotification && (
-        <div className="fixed top-20 right-4 left-4 sm:left-auto sm:w-96 z-50 animate-bounce-once shadow-2xl">
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 rounded-2xl border-2 border-emerald-300 shadow-emerald-500/30 flex items-start justify-between gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
-              <Bell className="w-5 h-5 text-amber-300 animate-bounce stroke-[2.5]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">
-                  🔔 ¡PLATO LISTO EN COCINA!
-                </span>
-                <span className="text-[10px] text-emerald-200">{readyNotification.time}</span>
+      {/* NOTIFICACIÓN FLOTANTE EN VIVO TIPO CELULAR / ALARMA (NUEVO PEDIDO O PLATO LISTO) */}
+      {activeAlert && (
+        <div className="fixed top-20 right-4 left-4 sm:left-auto sm:w-[420px] z-50 shadow-2xl">
+          {activeAlert.type === 'READY' ? (
+            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-700 text-white p-4 rounded-3xl border-4 border-emerald-300 shadow-emerald-900/60 animate-alarm-green flex items-start justify-between gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                <Bell className="w-7 h-7 text-amber-300 animate-bounce stroke-[2.5]" />
               </div>
-              <h4 className="text-sm font-black mt-1 leading-snug">
-                {readyNotification.tableName} {readyNotification.subAccount ? `(${readyNotification.subAccount})` : ''}
-              </h4>
-              <p className="text-xs text-emerald-100 font-medium">
-                Tomado por: {readyNotification.waiterName || 'Mesera'} • ¡Listo para retirar y servir!
-              </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white text-emerald-800 px-2.5 py-0.5 rounded-full shadow-sm">
+                    🔔 ¡PLATO LISTO PARA SERVIR!
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-200">{activeAlert.time}</span>
+                </div>
+                <h4 className="text-base font-black mt-1 leading-snug drop-shadow">
+                  {activeAlert.tableName} {activeAlert.subAccount ? `(${activeAlert.subAccount})` : ''}
+                </h4>
+                <p className="text-xs text-emerald-100 font-medium">
+                  Atiende: <span className="font-black text-white">{activeAlert.waiterName || 'Mesera'}</span> • ¡Retirar de cocina de inmediato!
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveAlert(null)}
+                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/20 transition-colors"
+                title="Cerrar notificación"
+              >
+                <X className="w-5 h-5 stroke-[2.5]" />
+              </button>
             </div>
-            <button
-              onClick={() => setReadyNotification(null)}
-              className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-              title="Cerrar notificación"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          ) : (
+            <div className="bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 text-white p-4 rounded-3xl border-4 border-amber-300 shadow-rose-900/60 animate-alarm-pulse flex items-start justify-between gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                <Flame className="w-7 h-7 text-amber-200 animate-bounce stroke-[2.5]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white text-rose-700 px-2.5 py-0.5 rounded-full shadow-sm">
+                    🚨 ¡NUEVO PEDIDO DE MESERA!
+                  </span>
+                  <span className="text-[10px] font-bold text-rose-200">{activeAlert.time}</span>
+                </div>
+                <h4 className="text-base font-black mt-1 leading-snug drop-shadow">
+                  {activeAlert.tableName} {activeAlert.subAccount ? `(${activeAlert.subAccount})` : ''}
+                </h4>
+                <p className="text-xs text-rose-100 font-medium">
+                  Comanda enviada por: <span className="font-black text-white">{activeAlert.waiterName || 'Mesera'}</span> • ¡Preparar en cocina!
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveAlert(null)}
+                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/20 transition-colors"
+                title="Cerrar notificación"
+              >
+                <X className="w-5 h-5 stroke-[2.5]" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

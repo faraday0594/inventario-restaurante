@@ -1,0 +1,23 @@
+{
+  "name": "Restaurante & Comandas",
+  "short_name": "Comandas",
+  "description": "Sistema de Comandas, Cocina KDS y Bodega",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1b1915",
+  "theme_color": "#1b1915",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

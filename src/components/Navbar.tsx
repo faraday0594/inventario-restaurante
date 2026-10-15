@@ -140,6 +140,28 @@ export function Navbar({
                 <span className="sm:hidden">Factura</span>
               </button>
             )}
+            {/* Botón Activar Alertas y Notificaciones Celular */}
+            <button
+              onClick={async () => {
+                const { requestNotificationPermission, sendNativeNotification } = await import('@/lib/notificationService');
+                const { getAudioContext, playReadyOrderChime } = await import('@/lib/soundUtils');
+                getAudioContext();
+                playReadyOrderChime();
+                const perm = await requestNotificationPermission();
+                if (perm === 'granted') {
+                  sendNativeNotification('🔔 ¡Alertas Activadas!', {
+                    body: 'Ahora recibirás notificaciones en la pantalla de tu celular cuando haya pedidos o platos listos.',
+                    tag: 'alerta-test'
+                  });
+                }
+              }}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl text-amber-700 bg-amber-50 hover:bg-amber-100 font-bold text-xs flex items-center gap-1.5 transition-colors border border-amber-200/80 active:scale-95"
+              title="Activar o probar sonido y notificaciones en tu celular"
+            >
+              <Sparkles className="w-4 h-4 text-amber-600 animate-pulse" />
+              <span className="hidden sm:inline">Activar Alertas Celular</span>
+              <span className="sm:hidden">Alertas</span>
+            </button>
 
             {/* Pastilla de Usuario Activo y Switch */}
             <button
