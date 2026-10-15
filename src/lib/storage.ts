@@ -593,10 +593,11 @@ export async function getAllMovements(limit = 100, user?: { role: UserRole }): P
 
 function extractVolume(text: string): string | null {
   const lower = text.toLowerCase();
-  if (lower.match(/1\.5\s*(l|lt|litro)/)) return '1.5l';
-  if (lower.match(/2\s*(l|lt|litro)/)) return '2l';
-  if (lower.match(/2\.5\s*(l|lt|litro)/)) return '2.5l';
-  if (lower.match(/3\s*(l|lt|litro)/)) return '3l';
+  if (lower.match(/(1000\s*(ml|cc)|1\s*(l|lt|litro)\b)/)) return '1l';
+  if (lower.match(/(1\.5\s*(l|lt|litro)|1500\s*(ml|cc))/)) return '1.5l';
+  if (lower.match(/(2\s*(l|lt|litro)|2000\s*(ml|cc))/)) return '2l';
+  if (lower.match(/(2\.5\s*(l|lt|litro)|2500\s*(ml|cc))/)) return '2.5l';
+  if (lower.match(/(3\s*(l|lt|litro)|3000\s*(ml|cc))/)) return '3l';
   if (lower.match(/600\s*(ml|cc)/)) return '600ml';
   if (lower.match(/500\s*(ml|cc)/)) return '500ml';
   if (lower.match(/400\s*(ml|cc)/)) return '400ml';

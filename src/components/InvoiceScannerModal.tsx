@@ -4,7 +4,7 @@ import React, { useState, useRef } from 'react';
 import { Product, User } from '@/lib/types';
 import { compressAndResizeImage, compressAndResizeDataUrl } from '@/lib/imageUtils';
 import { 
-  X, Camera, ImageIcon, Sparkles, Check, AlertCircle, RefreshCw, PlusCircle, ArrowRight, Trash2, Filter
+  X, Camera, ImageIcon, Sparkles, Check, AlertCircle, RefreshCw, PlusCircle, ArrowRight, Trash2, Filter, Edit2, CheckSquare, Square
 } from 'lucide-react';
 
 interface MatchedItemUI {
@@ -20,6 +20,8 @@ interface MatchedItemUI {
   isNew: boolean;
   isBeverage?: boolean;
   suggestedCategory?: string;
+  suggestedNameUpdate?: string | null;
+  updateExistingName?: boolean;
   newProductDetails?: {
     name: string;
     category: string;
@@ -155,6 +157,8 @@ export function InvoiceScannerModal({
           isNew,
           isBeverage: isBev,
           suggestedCategory: cat,
+          suggestedNameUpdate: it.suggestedNameUpdate || null,
+          updateExistingName: it.updateExistingName ?? Boolean(it.suggestedNameUpdate),
           newProductDetails: isNew ? {
             name: cleanName,
             category: cat,
@@ -242,6 +246,8 @@ export function InvoiceScannerModal({
           unitPrice: it.unitPrice,
           productId: it.matchedProductId,
           createNew: it.isNew,
+          updateExistingName: it.updateExistingName,
+          newProductName: it.suggestedNameUpdate,
           newProductDetails: it.newProductDetails
         }))
       };
@@ -598,6 +604,67 @@ export function InvoiceScannerModal({
                           </optgroup>
                         </select>
                       </div>
+
+                      {/* PANEL INTELIGENTE: Sugerencia de corrección de nombre según la factura (evita crear productos duplicados) */}
+                      {!item.isNew && item.matchedProductId && item.suggestedNameUpdate && (
+                        <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/80 shadow-sm space-y-2 mt-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span className="text-[11px] font-black uppercase text-amber-900 tracking-wider">
+                                Corrección inteligente de nombre por Factura
+                              </span>
+                            </div>
+                            <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                              IA MiniMax
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-slate-700">
+                            En bodega está registrado como: <strong className="text-slate-900 font-bold bg-white/80 px-1.5 py-0.5 rounded border border-slate-200">{item.matchedProductName || 'Producto actual'}</strong>.
+                            <br />
+                            La factura indica el nombre técnico: <strong className="text-amber-950 font-black">{item.suggestedNameUpdate}</strong>.
+                          </p>
+
+                          {/* Checkbox para autorizar actualizar el nombre */}
+                          <label className="flex items-center gap-2 cursor-pointer pt-1 text-xs font-bold text-amber-950 select-none">
+                            <input
+                              type="checkbox"
+                              checked={item.updateExistingName ?? true}
+                              onChange={(e) => {
+                                const updated = [...items];
+                                updated[idx].updateExistingName = e.target.checked;
+                                setItems(updated);
+                              }}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300"
+                            />
+                            <span>Actualizar el nombre en el inventario al guardar (conservando el anterior como alias)</span>
+                          </label>
+
+                          {/* Campo editable si el usuario quiere afinar el nuevo nombre */}
+                          {(item.updateExistingName ?? true) && (
+                            <div className="pt-1">
+                              <label className="text-[10px] text-amber-900 font-bold uppercase block mb-1">
+                                Nombre técnico con el que quedará en catálogo:
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={item.suggestedNameUpdate || ''}
+                                  onChange={(e) => {
+                                    const updated = [...items];
+                                    updated[idx].suggestedNameUpdate = e.target.value;
+                                    setItems(updated);
+                                  }}
+                                  className="w-full text-xs font-bold p-2 border border-amber-300 rounded-xl bg-white text-slate-900 focus:ring-1 focus:ring-amber-500"
+                                  placeholder="Ej: Agua Cristal PET 1000ml"
+                                />
+                                <Edit2 className="w-4 h-4 text-amber-600 shrink-0" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Si es NUEVO producto, mostrar campos editables para que quede perfecto */}
                       {item.isNew && item.newProductDetails && (

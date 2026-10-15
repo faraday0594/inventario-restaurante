@@ -8,6 +8,8 @@ interface ConfirmItemPayload {
   unitPrice?: number;
   productId?: string | null;
   createNew?: boolean;
+  updateExistingName?: boolean; // Bandera para actualizar el nombre del producto existente
+  newProductName?: string | null; // El nuevo nombre técnico a asignar al producto existente
   newProductDetails?: {
     name: string;
     category: string;
@@ -59,12 +61,30 @@ export async function POST(request: Request) {
       }
 
       if (targetId) {
-        // Asegurar que el alias del producto guarde el nombre de la factura para la próxima vez
         const existing = await getProductById(targetId);
-        if (existing && !existing.aliases.includes(item.rawName)) {
+        if (existing) {
+          const newAliases = [...(existing.aliases || [])];
+          if (!newAliases.includes(item.rawName)) {
+            newAliases.push(item.rawName);
+          }
+
+          // Si el usuario aprobó corregir/actualizar el nombre de acuerdo a la factura
+          let finalName = existing.name;
+          if (item.updateExistingName && item.newProductName && item.newProductName.trim()) {
+            const proposedName = item.newProductName.trim();
+            if (proposedName.toLowerCase() !== existing.name.toLowerCase()) {
+              // Guardar el nombre viejo en los aliases para no perder búsquedas previas
+              if (!newAliases.includes(existing.name)) {
+                newAliases.push(existing.name);
+              }
+              finalName = proposedName;
+            }
+          }
+
           await saveProduct({
             ...existing,
-            aliases: [...existing.aliases, item.rawName],
+            name: finalName,
+            aliases: newAliases,
             costPrice: item.unitPrice && item.unitPrice > 0 ? item.unitPrice : existing.costPrice
           }, user);
         }

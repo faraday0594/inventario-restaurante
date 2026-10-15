@@ -91,10 +91,13 @@ export interface InvoiceExtractedItem {
   unitPrice?: number;
   totalPrice?: number;
   matchedProductId?: string | null;
+  matchedProductName?: string | null;
   confidence?: number;
   isNew?: boolean;
   isBeverage?: boolean;
   suggestedCategory?: string;
+  suggestedNameUpdate?: string | null; // Sugerencia de la IA para corregir el nombre actual en bodega
+  updateExistingName?: boolean; // Si el usuario aprueba actualizar el nombre del producto
 }
 
 export interface InvoiceScanResult {

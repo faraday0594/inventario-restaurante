@@ -111,3 +111,118 @@ Responde ÚNICAMENTE un objeto JSON válido con este formato:
 
   return parsed;
 }
+
+export interface ReconcileDecision {
+  rawName: string;
+  matchedProductId: string | null;
+  confidence: number;
+  isNew: boolean;
+  suggestedNameUpdate?: string | null; // Nombre técnico/estandarizado si el producto existente tenía un nombre informal o desactualizado
+  reason?: string;
+}
+
+/**
+ * Utiliza IA MiniMax para comparar inteligentemente los ítems de la factura
+ * con los productos existentes en el catálogo del restaurante.
+ * Si encuentra un producto equivalente que fue creado con un nombre informal o diferente
+ * (ejemplo: "agua litro crystal" vs "Agua Cristal PET 1000ml"),
+ * empareja el producto y propone corregir el nombre en lugar de duplicarlo.
+ */
+export async function reconcileProductsWithAI(
+  extractedItems: { rawName: string; cleanName?: string; presentation?: string }[],
+  existingProducts: { id: string; name: string; presentation: string; category: string; aliases: string[] }[]
+): Promise<Record<string, ReconcileDecision>> {
+  if (!extractedItems.length || !existingProducts.length) {
+    return {};
+  }
+
+  const apiKey = process.env.MINIMAX_API_KEY;
+  const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.io/v1';
+  const model = process.env.MINIMAX_MODEL || 'MiniMax-M3';
+
+  if (!apiKey) return {};
+
+  const prompt = `
+Eres un experto en inventarios y auditoría de restaurantes y bares.
+Tu misión es EMPAREJAR los productos que vienen en una factura con los productos que el restaurante YA TIENE registrados en su bodega, y DETECTAR si el restaurante le había puesto un nombre informal o incompleto para CORREGIRLO con el nombre técnico/oficial de la factura.
+
+REGLA CLAVE:
+Si el usuario creó un producto llamado por ejemplo "agua litro crystal" o "coca cola grande", y en la factura viene "AGUA CRISTAL PET 1000ML" o "Agua Cristal 1000ml":
+- NO crees un producto nuevo.
+- Empareja con el producto existente ("agua litro crystal").
+- Sugiere en 'suggestedNameUpdate' el nombre mejorado y técnico (ej: "Agua Cristal PET 1000ml" o "Agua Cristal 1L").
+- De esta manera se corrige el nombre en el inventario en lugar de crear un producto duplicado.
+
+Lista de productos en bodega actualmente:
+${JSON.stringify(existingProducts.map(p => ({ id: p.id, name: p.name, presentation: p.presentation, aliases: p.aliases })), null, 2)}
+
+Lista de productos leídos de la factura:
+${JSON.stringify(extractedItems.map(it => ({ rawName: it.rawName, cleanName: it.cleanName, presentation: it.presentation })), null, 2)}
+
+Devuelve ÚNICAMENTE un JSON con este formato:
+{
+  "matches": [
+    {
+      "rawName": "nombre exacto en factura",
+      "matchedProductId": "id_del_producto_en_bodega" o null si es realmente nuevo,
+      "confidence": 0.95,
+      "isNew": false,
+      "suggestedNameUpdate": "Nombre técnico corregido si amerita cambiar el nombre actual en bodega, o null si no se debe cambiar",
+      "reason": "Explicación breve de por qué corresponde a este producto"
+    }
+  ]
+}
+`;
+
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: 'Eres un sistema experto en cotejo de inventarios de restaurantes. Responde solo JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.1
+      })
+    });
+
+    if (!response.ok) return {};
+
+    const data = await response.json();
+    const rawContent: string = data.choices?.[0]?.message?.content || '';
+    let cleaned = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) return {};
+
+    const parsed = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+    const result: Record<string, ReconcileDecision> = {};
+
+    if (Array.isArray(parsed.matches)) {
+      for (const m of parsed.matches) {
+        if (m.rawName) {
+          result[m.rawName] = {
+            rawName: m.rawName,
+            matchedProductId: m.matchedProductId || null,
+            confidence: typeof m.confidence === 'number' ? m.confidence : 0.9,
+            isNew: !m.matchedProductId,
+            suggestedNameUpdate: m.suggestedNameUpdate || null,
+            reason: m.reason || ''
+          };
+        }
+      }
+    }
+    return result;
+  } catch (err) {
+    console.warn('Error en reconciliación semántica con IA:', err);
+    return {};
+  }
+}
+
