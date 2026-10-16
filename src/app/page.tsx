@@ -17,6 +17,8 @@ import { OrdersHistoryView } from '@/components/OrdersHistoryView';
 import { MenuManagementModal } from '@/components/MenuManagementModal';
 import { UsersManagementModal } from '@/components/UsersManagementModal';
 import { DbStatusModal } from '@/components/DbStatusModal';
+import { FridgeTransferModal } from '@/components/FridgeTransferModal';
+import { PriceListScannerModal } from '@/components/PriceListScannerModal';
 import { 
   Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert,
   Bell, X, Flame
@@ -49,6 +51,9 @@ export default function HomePage() {
   const [isUsersManagementOpen, setIsUsersManagementOpen] = useState(false);
   const [isDbStatusOpen, setIsDbStatusOpen] = useState(false);
   const [isDbConnected, setIsDbConnected] = useState(false);
+  const [isFridgeTransferOpen, setIsFridgeTransferOpen] = useState(false);
+  const [productForFridge, setProductForFridge] = useState<Product | null>(null);
+  const [isPriceListScannerOpen, setIsPriceListScannerOpen] = useState(false);
   const [productToAdjust, setProductToAdjust] = useState<Product | null>(null);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
@@ -421,6 +426,7 @@ export default function HomePage() {
         onOpenMenuManagement={() => setIsMenuManagementOpen(true)}
         onOpenUsersManagement={() => setIsUsersManagementOpen(true)}
         onOpenDbStatus={() => setIsDbStatusOpen(true)}
+        onOpenPriceListScanner={() => setIsPriceListScannerOpen(true)}
         dbConnected={isDbConnected}
       />
 
@@ -620,6 +626,10 @@ export default function HomePage() {
                     currentUser={currentUser}
                     onQuickAdjust={handleQuickAdjust}
                     onOpenAdjust={(p) => setProductToAdjust(p)}
+                    onOpenFridgeTransfer={(p) => {
+                      setProductForFridge(p);
+                      setIsFridgeTransferOpen(true);
+                    }}
                     onEdit={(p) => {
                       setProductToEdit(p);
                       setIsNewProductOpen(true);
@@ -658,6 +668,28 @@ export default function HomePage() {
         }}
         onSave={handleSaveProduct}
         onDelete={handleDeleteProduct}
+        onOpenPriceListScanner={() => setIsPriceListScannerOpen(true)}
+      />
+
+      {/* Modal de Traslado a Nevera de Bodega */}
+      <FridgeTransferModal
+        isOpen={isFridgeTransferOpen}
+        onClose={() => {
+          setIsFridgeTransferOpen(false);
+          setProductForFridge(null);
+        }}
+        product={productForFridge}
+        currentUser={currentUser}
+        onSuccess={fetchData}
+      />
+
+      {/* Modal de Escaneo de Lista de Precios con Foto */}
+      <PriceListScannerModal
+        isOpen={isPriceListScannerOpen}
+        onClose={() => setIsPriceListScannerOpen(false)}
+        products={products}
+        currentUser={currentUser}
+        onSuccess={fetchData}
       />
 
       {currentUser?.role === 'ADMIN' && (

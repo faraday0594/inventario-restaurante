@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product, User } from '@/lib/types';
-import { X, Check, PackagePlus, Trash2, Lock } from 'lucide-react';
+import { X, Check, PackagePlus, Trash2, Lock, Sparkles } from 'lucide-react';
 
 interface NewProductModalProps {
   productToEdit?: Product | null;
@@ -11,6 +11,7 @@ interface NewProductModalProps {
   onClose: () => void;
   onSave: (product: any) => Promise<void>;
   onDelete?: (productId: string) => Promise<void>;
+  onOpenPriceListScanner?: () => void;
 }
 
 const CATEGORIES = ['Gaseosas', 'Aguas', 'Cervezas', 'Té y Jugos', 'Energizantes', 'Snacks y Golosinas', 'Licores', 'Otros'];
@@ -21,7 +22,8 @@ export function NewProductModal({
   isOpen,
   onClose,
   onSave,
-  onDelete
+  onDelete,
+  onOpenPriceListScanner
 }: NewProductModalProps) {
   if (!isOpen) return null;
 
@@ -128,6 +130,31 @@ export function NewProductModal({
 
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 flex-1">
+          {/* Atajo para escanear lista si es producto nuevo */}
+          {!productToEdit && onOpenPriceListScanner && (
+            <div className="p-3 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200/80 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-purple-950">¿Tienes varios productos con precios?</h4>
+                  <p className="text-[11px] text-purple-700">Toma una foto de tu lista para crearlos todos automáticamente</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenPriceListScanner();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shrink-0 shadow-sm"
+              >
+                📸 Escanear Lista
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Nombre Comercial *

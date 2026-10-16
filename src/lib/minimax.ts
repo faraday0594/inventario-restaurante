@@ -226,3 +226,121 @@ Devuelve ÚNICAMENTE un JSON con este formato:
   }
 }
 
+/**
+ * Analiza la foto de una lista de precios, menú, carta de bebidas, pizarra o listado
+ * manuscrito donde están los nombres de los productos y su precio al frente.
+ * Extrae cada producto, su precio de venta, presentación y categoría sugerida.
+ */
+export async function parsePriceListWithMiniMax(imageBase64Url: string): Promise<import('./types').PriceListScanResult> {
+  const apiKey = process.env.MINIMAX_API_KEY;
+  const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.io/v1';
+  const model = process.env.MINIMAX_MODEL || 'MiniMax-M3';
+
+  if (!apiKey) {
+    throw new Error('MINIMAX_API_KEY no está configurada en el archivo de entorno.');
+  }
+
+  const systemInstruction = `
+Eres un asistente de digitalización de inventarios y precios para restaurantes, bares y cafeterías en Colombia y Latinoamérica.
+Tu tarea es leer la foto de un LISTADO DE PRODUCTOS CON PRECIOS (puede ser una carta de precios, menú, pizarra, lista escrita a mano o catálogo de bebidas/productos).
+En el documento hay productos con su PRECIO DE VENTA al frente (por ejemplo: "Agua Cristal 600ml ... $3.000", "Coca-Cola 400ml - 5000", "Corona 8.000", etc.).
+
+REGLAS DE EXTRACCIÓN:
+1. Extrae CADA producto visible con el precio que tiene asignado.
+2. Limpieza de Precios (salePrice):
+   - Conviértelo siempre a número entero en pesos (COP).
+   - "$3.000" -> 3000
+   - "4.500" o "4,500" -> 4500
+   - "5k" o "5 mil" -> 5000
+   - Si no tiene precio visible, pon 0.
+3. Genera un nombre comercial limpio (cleanName) y presentación (presentation):
+   - Ej: "Agua Cristal 600ml" -> cleanName: "Agua Cristal 600ml", presentation: "Botella PET 600ml"
+   - Ej: "Corona" -> cleanName: "Cerveza Corona Extra", presentation: "Botella 355ml"
+   - Ej: "Coca Cola Pet 400" -> cleanName: "Coca-Cola Original 400ml", presentation: "Botella PET 400ml"
+4. Asigna la categoría correcta:
+   - "Gaseosas", "Cervezas", "Aguas", "Jugos y Té", "Energizantes", "Licores", "Snacks y Golosinas", o "Comidas y Platos".
+5. Calcula un costo estimado sugerido (costPrice) como el 60% del precio de venta (Math.round(salePrice * 0.6)).
+6. Identifica isBeverage: true para bebidas, false para comidas/snacks.
+
+Responde ÚNICAMENTE un objeto JSON válido con este formato exacto:
+{
+  "title": "Lista de Precios Restaurante",
+  "date": "2026-10-16",
+  "items": [
+    {
+      "rawName": "Agua Cristal 600ml $3.000",
+      "cleanName": "Agua Cristal Sin Gas 600ml",
+      "presentation": "Botella PET 600ml",
+      "category": "Aguas",
+      "salePrice": 3000,
+      "costPrice": 1800,
+      "isBeverage": true
+    }
+  ]
+}
+`;
+
+  const payload = {
+    model: model,
+    messages: [
+      {
+        role: 'system',
+        content: systemInstruction
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: 'Lee atentamente todos los productos de este listado con su respectivo precio al frente y devuélvelos en formato JSON.'
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: imageBase64Url
+            }
+          }
+        ]
+      }
+    ],
+    temperature: 0.1
+  };
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Error en MiniMax API (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const rawContent: string = data.choices?.[0]?.message?.content || '';
+
+  let cleaned = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+
+  if (firstBrace === -1 || lastBrace === -1) {
+    throw new Error('MiniMax no devolvió un formato JSON válido. Respuesta: ' + rawContent);
+  }
+
+  const jsonString = cleaned.substring(firstBrace, lastBrace + 1);
+  const parsed = JSON.parse(jsonString) as import('./types').PriceListScanResult;
+
+  if (!parsed.items || !Array.isArray(parsed.items)) {
+    parsed.items = [];
+  }
+
+  return parsed;
+}
+
+

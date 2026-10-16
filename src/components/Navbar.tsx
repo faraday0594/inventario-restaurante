@@ -26,6 +26,7 @@ interface NavbarProps {
   onOpenMenuManagement: () => void;
   onOpenUsersManagement: () => void;
   onOpenDbStatus?: () => void;
+  onOpenPriceListScanner?: () => void;
   dbConnected?: boolean;
 }
 
@@ -46,6 +47,7 @@ export function Navbar({
   onOpenMenuManagement,
   onOpenUsersManagement,
   onOpenDbStatus,
+  onOpenPriceListScanner,
   dbConnected
 }: NavbarProps) {
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -148,6 +150,19 @@ export function Navbar({
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden md:inline">Nueva Bebida</span>
+              </button>
+            )}
+
+            {/* BOTÓN ESCANEAR LISTA DE PRECIOS CON FOTO: SOLO ADMIN O EMPLEADO DE BODEGA */}
+            {(isAdmin || isEmpleado) && onOpenPriceListScanner && (
+              <button
+                onClick={onOpenPriceListScanner}
+                className="px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 border border-purple-200 transition-all active:scale-95"
+                title="Escanear lista de precios o carta con foto para registrar productos y precios masivamente"
+              >
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <span className="hidden sm:inline">Lista Precios</span>
+                <span className="sm:hidden">Precios</span>
               </button>
             )}
 

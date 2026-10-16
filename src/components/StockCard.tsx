@@ -2,13 +2,14 @@
 
 import React from 'react';
 import { Product, User } from '@/lib/types';
-import { Plus, Minus, AlertTriangle, CheckCircle2, XCircle, SlidersHorizontal, Lock } from 'lucide-react';
+import { Plus, Minus, AlertTriangle, CheckCircle2, XCircle, SlidersHorizontal, Lock, Snowflake, Package } from 'lucide-react';
 
 interface StockCardProps {
   product: Product;
   currentUser: Omit<User, 'pin'> | null;
   onQuickAdjust: (productId: string, delta: number, type: 'ENTRADA' | 'SALIDA', reason: string) => void;
   onOpenAdjust: (product: Product) => void;
+  onOpenFridgeTransfer?: (product: Product) => void;
   onEdit: (product: Product) => void;
   isUpdating: boolean;
 }
@@ -18,6 +19,7 @@ export function StockCard({
   currentUser,
   onQuickAdjust,
   onOpenAdjust,
+  onOpenFridgeTransfer,
   onEdit,
   isUpdating
 }: StockCardProps) {
@@ -95,10 +97,31 @@ export function StockCard({
             <span className="font-medium text-slate-600">{formatMoney(product.costPrice)}</span>
           </div>
         </div>
+
+        {/* Ubicaciones de Stock: Bodega y Nevera */}
+        <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs">
+          <div className="bg-slate-50/90 p-2 rounded-xl border border-slate-100 flex flex-col items-center">
+            <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+              <Package className="w-3 h-3 text-slate-500" /> Bodega
+            </span>
+            <span className={`text-sm font-black ${product.stock <= 0 ? 'text-red-600' : 'text-slate-800'}`}>
+              {product.stock} <span className="text-[10px] font-normal text-slate-400">unids</span>
+            </span>
+          </div>
+
+          <div className="bg-cyan-50/60 p-2 rounded-xl border border-cyan-100 flex flex-col items-center">
+            <span className="text-[10px] text-cyan-700 font-bold uppercase flex items-center gap-1">
+              <Snowflake className="w-3 h-3 text-cyan-600" /> Nevera
+            </span>
+            <span className="text-sm font-black text-cyan-900">
+              {product.fridgeStock || 0} <span className="text-[10px] font-normal text-cyan-600">frías</span>
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Control de Stock táctil inferior */}
-      <div className="p-4 pt-2 border-t border-slate-100 bg-slate-50/50">
+      {/* Control de Stock táctil inferior y Botón Salida a Nevera */}
+      <div className="p-4 pt-2 border-t border-slate-100 bg-slate-50/50 space-y-2">
         {isAdmin ? (
           // VISTA ADMIN: Control total (+, -, ajuste manual)
           <div className="flex items-center justify-between gap-3">
@@ -106,8 +129,8 @@ export function StockCard({
             <button
               onClick={() => onQuickAdjust(product.id, -1, 'SALIDA', 'Salida manual rápida')}
               disabled={isUpdating || product.stock <= 0}
-              className="flex-1 h-12 flex items-center justify-center rounded-xl bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 disabled:opacity-40 disabled:active:scale-100 transition-all font-bold text-base shadow-sm"
-              title="Restar 1 unidad (Solo Admin)"
+              className="flex-1 h-11 flex items-center justify-center rounded-xl bg-red-100 text-red-700 hover:bg-red-200 active:scale-95 disabled:opacity-40 disabled:active:scale-100 transition-all font-bold text-base shadow-sm"
+              title="Restar 1 unidad de bodega (Solo Admin)"
             >
               <Minus className="w-5 h-5 stroke-[2.5]" />
             </button>
@@ -116,38 +139,38 @@ export function StockCard({
             <button
               onClick={() => onOpenAdjust(product)}
               className="flex-1 flex flex-col items-center justify-center py-1 px-2 rounded-xl hover:bg-slate-200/60 active:scale-95 transition-all group"
-              title="Ajustar cantidad manual"
+              title="Ajustar cantidad manual de bodega"
             >
               <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 group-hover:text-slate-600">
-                Stock
+                Bodega
               </span>
-              <span className={`text-2xl font-black ${
+              <span className={`text-xl font-black ${
                 isOutOfStock ? 'text-red-600' : isLowStock ? 'text-amber-600' : 'text-slate-900'
               }`}>
                 {product.stock}
               </span>
-              <span className="text-[10px] text-slate-400 font-medium">unid</span>
+              <span className="text-[9px] text-slate-400 font-medium">unid</span>
             </button>
 
             {/* Botón Sumar 1 */}
             <button
               onClick={() => onQuickAdjust(product.id, 1, 'ENTRADA', 'Entrada manual rápida')}
               disabled={isUpdating}
-              className="flex-1 h-12 flex items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all font-bold text-base shadow-sm shadow-emerald-600/25"
-              title="Sumar 1 unidad (Solo Admin)"
+              className="flex-1 h-11 flex items-center justify-center rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all font-bold text-base shadow-sm shadow-emerald-600/25"
+              title="Sumar 1 unidad a bodega (Solo Admin)"
             >
               <Plus className="w-5 h-5 stroke-[2.5]" />
             </button>
           </div>
         ) : (
-          // VISTA EMPLEADO: Modo solo lectura de números de stock (el empleado ingresa stock exclusivamente mediante la factura con foto)
+          // VISTA EMPLEADO: Modo informativo de Bodega
           <div className="flex items-center justify-between py-1.5 px-3 bg-white rounded-xl border border-slate-200">
             <div className="flex items-center gap-2">
               <Lock className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-xs font-semibold text-slate-500">Stock en Bodega:</span>
+              <span className="text-xs font-semibold text-slate-500">Bodega:</span>
             </div>
             <div className="text-right">
-              <span className={`text-xl font-black ${
+              <span className={`text-lg font-black ${
                 isOutOfStock ? 'text-red-600' : isLowStock ? 'text-amber-600' : 'text-slate-900'
               }`}>
                 {product.stock}
@@ -155,6 +178,18 @@ export function StockCard({
               <span className="text-[10px] text-slate-400 font-medium ml-1">unid</span>
             </div>
           </div>
+        )}
+
+        {/* BOTÓN RÁPIDO: TRASLADAR / SALIDA A NEVERA (Habilitado para Admin y Empleado) */}
+        {onOpenFridgeTransfer && (
+          <button
+            onClick={() => onOpenFridgeTransfer(product)}
+            className="w-full py-2 px-3 rounded-xl bg-cyan-50 hover:bg-cyan-100 active:bg-cyan-200 text-cyan-800 border border-cyan-200/80 font-black text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 shadow-xs"
+            title="Registrar traslado de botellas de bodega a la nevera"
+          >
+            <Snowflake className="w-4 h-4 text-cyan-600" />
+            <span>Mover a Nevera ❄️ ({product.fridgeStock || 0} frías)</span>
+          </button>
         )}
       </div>
     </div>

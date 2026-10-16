@@ -57,7 +57,8 @@ export interface Product {
   name: string;
   category: string;
   presentation: string;
-  stock: number;
+  stock: number; // Stock principal en Bodega
+  fridgeStock?: number; // Stock frío en Nevera / Barra (listo para servir)
   minStock: number;
   costPrice: number;
   salePrice: number;
@@ -66,7 +67,7 @@ export interface Product {
   updatedAt: string;
 }
 
-export type MovementType = 'ENTRADA' | 'SALIDA' | 'MERMA' | 'AJUSTE';
+export type MovementType = 'ENTRADA' | 'SALIDA' | 'MERMA' | 'AJUSTE' | 'TRASLADO_NEVERA' | 'REGRESO_BODEGA';
 
 export interface Movement {
   id: string;
@@ -106,3 +107,27 @@ export interface InvoiceScanResult {
   date?: string;
   items: InvoiceExtractedItem[];
 }
+
+export interface PriceListExtractedItem {
+  rawName: string;
+  cleanName: string;
+  presentation: string;
+  category: string;
+  salePrice: number;
+  costPrice?: number;
+  initialStock?: number;
+  isBeverage?: boolean;
+  matchedProductId?: string | null;
+  matchedProductName?: string | null;
+  currentPrice?: number;
+  isNew: boolean;
+  confidence?: number;
+  selected?: boolean;
+}
+
+export interface PriceListScanResult {
+  title?: string;
+  date?: string;
+  items: PriceListExtractedItem[];
+}
+

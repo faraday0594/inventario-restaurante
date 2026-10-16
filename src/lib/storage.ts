@@ -241,7 +241,14 @@ function normalizeData(data: InventoryData): InventoryData {
       }
     }
   }
-  if (!data.products || !Array.isArray(data.products)) data.products = [];
+  if (!data.products || !Array.isArray(data.products)) {
+    data.products = [];
+  } else {
+    data.products = data.products.map(p => ({
+      ...p,
+      fridgeStock: typeof p.fridgeStock === 'number' ? p.fridgeStock : 0
+    }));
+  }
   if (!data.movements || !Array.isArray(data.movements)) data.movements = [];
   if (!data.menuItems || !Array.isArray(data.menuItems) || data.menuItems.length === 0) {
     data.menuItems = [...INITIAL_MENU_ITEMS];
@@ -480,6 +487,7 @@ export async function saveProduct(
         ...existing,
         ...productData,
         stock: targetStock,
+        fridgeStock: typeof productData.fridgeStock === 'number' ? productData.fridgeStock : (existing.fridgeStock || 0),
         id: productData.id,
         aliases: Array.from(new Set([...existing.aliases, ...(productData.aliases || [])])),
         updatedAt: now
@@ -492,13 +500,15 @@ export async function saveProduct(
 
   const newProduct: Product = {
     ...productData,
-    id: `prod-${Date.now()}`,
+    stock: typeof productData.stock === 'number' ? productData.stock : 0,
+    fridgeStock: typeof productData.fridgeStock === 'number' ? productData.fridgeStock : 0,
+    id: `prod-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     aliases: productData.aliases || [],
     updatedAt: now
   };
   data.products.push(newProduct);
 
-  if (user) {
+  if (user && newProduct.stock > 0) {
     const creationMovement: Movement = {
       id: `mov-new-${Date.now()}`,
       productId: newProduct.id,
@@ -518,6 +528,73 @@ export async function saveProduct(
 
   await saveData(data);
   return newProduct;
+}
+
+export async function transferToFridge(
+  productId: string,
+  quantity: number,
+  direction: 'TO_FRIDGE' | 'TO_BODEGA' = 'TO_FRIDGE',
+  user?: { id: string; name: string; role: UserRole }
+): Promise<{ product: Product; movement: Movement }> {
+  if (quantity <= 0) {
+    throw new Error('La cantidad debe ser mayor a 0');
+  }
+
+  const data = await ensureData();
+  const product = data.products.find(p => p.id === productId);
+
+  if (!product) {
+    throw new Error(`Producto con ID ${productId} no encontrado`);
+  }
+
+  const prevBodega = product.stock;
+  const prevFridge = product.fridgeStock || 0;
+
+  let reason = '';
+  let type: MovementType = 'TRASLADO_NEVERA';
+
+  if (direction === 'TO_FRIDGE') {
+    if (product.stock < quantity) {
+      throw new Error(`Stock insuficiente en bodega (${product.stock} unids) para trasladar ${quantity} unidades a la nevera.`);
+    }
+    product.stock -= quantity;
+    product.fridgeStock = prevFridge + quantity;
+    type = 'TRASLADO_NEVERA';
+    reason = `Traslado de ${quantity} unids de Bodega a Nevera (Bodega: ${prevBodega} ➔ ${product.stock}, Nevera: ${prevFridge} ➔ ${product.fridgeStock})`;
+  } else {
+    if (prevFridge < quantity) {
+      throw new Error(`Stock insuficiente en nevera (${prevFridge} unids) para regresar ${quantity} unidades a bodega.`);
+    }
+    product.fridgeStock = prevFridge - quantity;
+    product.stock += quantity;
+    type = 'REGRESO_BODEGA';
+    reason = `Regreso de ${quantity} unids de Nevera a Bodega (Nevera: ${prevFridge} ➔ ${product.fridgeStock}, Bodega: ${prevBodega} ➔ ${product.stock})`;
+  }
+
+  product.updatedAt = new Date().toISOString();
+
+  const movement: Movement = {
+    id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    productId: product.id,
+    productName: product.name,
+    type,
+    quantity,
+    previousStock: prevBodega,
+    newStock: product.stock,
+    reason: user?.name ? `${reason} por ${user.name} (${user.role})` : reason,
+    userId: user?.id,
+    userName: user?.name || 'Sistema',
+    userRole: user?.role || 'ADMIN',
+    createdAt: new Date().toISOString()
+  };
+
+  data.movements.unshift(movement);
+  if (data.movements.length > 500) {
+    data.movements = data.movements.slice(0, 500);
+  }
+
+  await saveData(data);
+  return { product, movement };
 }
 
 export async function updateProductStock(

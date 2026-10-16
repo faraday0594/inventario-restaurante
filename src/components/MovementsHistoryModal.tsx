@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Movement } from '@/lib/types';
-import { X, History, ArrowDownRight, ArrowUpRight, AlertOctagon, User, Shield, Search } from 'lucide-react';
+import { X, History, ArrowDownRight, ArrowUpRight, AlertOctagon, User, Shield, Search, Snowflake, Package } from 'lucide-react';
 
 interface MovementsHistoryModalProps {
   movements: Movement[];
@@ -133,6 +133,8 @@ export function MovementsHistoryModal({
             filteredMovements.map((mov) => {
               const isEntrada = mov.type === 'ENTRADA';
               const isMerma = mov.type === 'MERMA';
+              const isNevera = mov.type === 'TRASLADO_NEVERA';
+              const isRegreso = mov.type === 'REGRESO_BODEGA';
               const isAdmin = mov.userRole === 'ADMIN';
 
               return (
@@ -142,13 +144,21 @@ export function MovementsHistoryModal({
                 >
                   <div className="flex items-start gap-3">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                      isEntrada 
-                        ? 'bg-emerald-100 text-emerald-700' 
-                        : isMerma 
-                          ? 'bg-amber-100 text-amber-700' 
-                          : 'bg-rose-100 text-rose-700'
+                      isNevera
+                        ? 'bg-cyan-100 text-cyan-700'
+                        : isRegreso
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : isEntrada 
+                            ? 'bg-emerald-100 text-emerald-700' 
+                            : isMerma 
+                              ? 'bg-amber-100 text-amber-700' 
+                              : 'bg-rose-100 text-rose-700'
                     }`}>
-                      {isEntrada ? (
+                      {isNevera ? (
+                        <Snowflake className="w-5 h-5 stroke-[2.2]" />
+                      ) : isRegreso ? (
+                        <Package className="w-5 h-5" />
+                      ) : isEntrada ? (
                         <ArrowUpRight className="w-5 h-5" />
                       ) : isMerma ? (
                         <AlertOctagon className="w-5 h-5" />

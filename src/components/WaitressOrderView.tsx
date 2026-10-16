@@ -843,14 +843,19 @@ export function WaitressOrderView({
                           className="bg-white p-3.5 rounded-2xl border border-slate-200 hover:border-emerald-300 hover:shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-between gap-3"
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block">
                                 {prod.category}
                               </span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
-                                prod.stock <= prod.minStock ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                                (prod.fridgeStock || 0) > 0 
+                                  ? 'bg-cyan-100 text-cyan-800' 
+                                  : 'bg-slate-100 text-slate-500'
                               }`}>
-                                Stock: {prod.stock}
+                                ❄️ Nevera: {prod.fridgeStock || 0}
+                              </span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                                📦 Bodega: {prod.stock}
                               </span>
                             </div>
                             <h4 className="text-sm font-bold text-slate-900 truncate">{prod.name}</h4>
