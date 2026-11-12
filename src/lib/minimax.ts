@@ -344,3 +344,148 @@ Responde ÚNICAMENTE un objeto JSON válido con este formato exacto:
 }
 
 
+
+export interface BeverageAuditInput {
+  id: string;
+  name: string;
+  category: string;
+  presentation: string;
+  costPrice: number;
+  salePrice: number;
+  aliases: string[];
+}
+
+export interface BeverageAuditSuggestion {
+  productId: string;
+  suggestedName: string;
+  suggestedPresentation: string;
+  suggestedCostPrice: number;
+  suggestedAliases: string[];
+  reason: string;
+}
+
+/**
+ * Analiza el catálogo de bebidas de bodega con MiniMax para estandarizar
+ * sus nombres técnicos, presentaciones, alias y estimar costos de fábrica/mayorista
+ * de referencia en Colombia, SIN modificar stock ni precios de venta.
+ */
+export async function auditBeveragesWithMiniMax(
+  products: BeverageAuditInput[]
+): Promise<BeverageAuditSuggestion[]> {
+  if (!products.length) return [];
+
+  const apiKey = process.env.MINIMAX_API_KEY;
+  const baseUrl = process.env.MINIMAX_BASE_URL || 'https://api.minimax.io/v1';
+  const model = process.env.MINIMAX_MODEL || 'MiniMax-M3';
+
+  if (!apiKey) {
+    throw new Error('MINIMAX_API_KEY no está configurada en el archivo de entorno.');
+  }
+
+  const batchSize = 25;
+  const allSuggestions: BeverageAuditSuggestion[] = [];
+
+  for (let i = 0; i < products.length; i += batchSize) {
+    const batch = products.slice(i, i + batchSize);
+
+    const systemInstruction = `
+Eres un auditor experto en compras, costos y catálogos de bebidas para restaurantes y bares en Colombia.
+Recibirás una lista de productos de bebidas actualmente en bodega.
+
+Tu tarea para CADA producto es:
+1. Generar un "suggestedName": nombre técnico y comercial estandarizado (marca + variedad + volumen exacto).
+   Ejemplos:
+   - "coca grande" -> "Coca-Cola Original 1.5L"
+   - "aguila light" -> "Cerveza Águila Light 330ml"
+   - "agua cristal" -> "Agua Cristal Sin Gas 600ml"
+2. Generar "suggestedPresentation": presentación técnica clara (ej: "Botella PET 400ml", "Botella Vidrio 350ml", "Lata 330ml", "Botella PET 1.5L").
+3. Estimar "suggestedCostPrice": costo unitario aproximado de fábrica / distribuidor mayorista en Colombia en pesos colombianos (COP, número entero).
+   - Toma en cuenta el mercado colombiano actual (Coca-Cola FEMSA, Postobón, Bavaria, etc.) y como referencia secundaria que el precio de venta del restaurante suele estar por encima del costo.
+   - Si no estás seguro de un producto poco común, usa una estimación prudente sin inventar cifras absurdas.
+4. Generar "suggestedAliases": 2 a 3 alias cortos como suelen aparecer en facturas de proveedores (ej: ["CC PET 400", "COCA COLA 400ML"]).
+5. Incluir "reason": explicación muy breve (máximo 12 palabras) del ajuste sugerido.
+
+REGLA ESTRICTA:
+- Devuelve exactamente el "productId" de entrada para cada producto.
+- NO sugieras cambios de stock ni de precio de venta.
+- Responde ÚNICAMENTE un JSON válido con este formato:
+{
+  "suggestions": [
+    {
+      "productId": "id_exacto",
+      "suggestedName": "Nombre Técnico Estándar",
+      "suggestedPresentation": "Botella PET 400ml",
+      "suggestedCostPrice": 2200,
+      "suggestedAliases": ["ALIAS 1", "ALIAS 2"],
+      "reason": "Nombre estandarizado y costo mayorista de referencia"
+    }
+  ]
+}
+`;
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          {
+            role: 'user',
+            content: `Analiza estas bebidas de bodega y devuelve las sugerencias en JSON:\n${JSON.stringify(
+              batch.map(p => ({
+                id: p.id,
+                name: p.name,
+                category: p.category,
+                presentation: p.presentation,
+                currentCostPrice: p.costPrice,
+                restaurantSalePrice: p.salePrice,
+                aliases: p.aliases
+              }))
+            )}`
+          }
+        ],
+        temperature: 0.1
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error en MiniMax API (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const rawContent: string = data.choices?.[0]?.message?.content || '';
+    let cleaned = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1) {
+      throw new Error('MiniMax no devolvió un JSON válido al auditar las bebidas.');
+    }
+
+    const parsed = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+    if (Array.isArray(parsed.suggestions)) {
+      for (const s of parsed.suggestions) {
+        if (s.productId) {
+          allSuggestions.push({
+            productId: String(s.productId),
+            suggestedName: String(s.suggestedName || '').trim(),
+            suggestedPresentation: String(s.suggestedPresentation || '').trim(),
+            suggestedCostPrice: Math.max(0, Math.round(Number(s.suggestedCostPrice) || 0)),
+            suggestedAliases: Array.isArray(s.suggestedAliases)
+              ? s.suggestedAliases.map((a: unknown) => String(a).trim()).filter(Boolean)
+              : [],
+            reason: String(s.reason || '').trim()
+          });
+        }
+      }
+    }
+  }
+
+  return allSuggestions;
+}

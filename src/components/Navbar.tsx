@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { 
-  Wine, Camera, Plus, History, Search, Sparkles, User as UserIcon, 
+  Wine, Camera, Plus, History, Search, Sparkles, Wand2, User as UserIcon, 
   Shield, UtensilsCrossed, ChefHat, Calendar, Settings, DollarSign, Database
 } from 'lucide-react';
 import { User } from '@/lib/types';
@@ -27,6 +27,7 @@ interface NavbarProps {
   onOpenUsersManagement: () => void;
   onOpenDbStatus?: () => void;
   onOpenPriceListScanner?: () => void;
+  onOpenBeverageAudit?: () => void;
   dbConnected?: boolean;
 }
 
@@ -48,6 +49,7 @@ export function Navbar({
   onOpenUsersManagement,
   onOpenDbStatus,
   onOpenPriceListScanner,
+  onOpenBeverageAudit,
   dbConnected
 }: NavbarProps) {
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -150,6 +152,19 @@ export function Navbar({
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden md:inline">Nueva Bebida</span>
+              </button>
+            )}
+
+            {/* BOTÓN AUDITORÍA IA DE BEBIDAS: SOLO ADMIN O EMPLEADO DE BODEGA */}
+            {(isAdmin || isEmpleado) && onOpenBeverageAudit && (
+              <button
+                onClick={onOpenBeverageAudit}
+                className="px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 border border-indigo-200 transition-all active:scale-95"
+                title="Enlistar bebidas de bodega y buscar nombres técnicos y costos de fábrica con MiniMax sin modificar stock ni precio de venta"
+              >
+                <Wand2 className="w-4 h-4 text-indigo-600" />
+                <span className="hidden sm:inline">Auditar IA</span>
+                <span className="sm:hidden">IA</span>
               </button>
             )}
 

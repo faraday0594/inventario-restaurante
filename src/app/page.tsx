@@ -19,6 +19,7 @@ import { UsersManagementModal } from '@/components/UsersManagementModal';
 import { DbStatusModal } from '@/components/DbStatusModal';
 import { FridgeTransferModal } from '@/components/FridgeTransferModal';
 import { PriceListScannerModal } from '@/components/PriceListScannerModal';
+import { BeverageAuditModal } from '@/components/BeverageAuditModal';
 import { 
   Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert,
   Bell, X, Flame
@@ -54,6 +55,7 @@ export default function HomePage() {
   const [isFridgeTransferOpen, setIsFridgeTransferOpen] = useState(false);
   const [productForFridge, setProductForFridge] = useState<Product | null>(null);
   const [isPriceListScannerOpen, setIsPriceListScannerOpen] = useState(false);
+  const [isBeverageAuditOpen, setIsBeverageAuditOpen] = useState(false);
   const [productToAdjust, setProductToAdjust] = useState<Product | null>(null);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
@@ -427,6 +429,7 @@ export default function HomePage() {
         onOpenUsersManagement={() => setIsUsersManagementOpen(true)}
         onOpenDbStatus={() => setIsDbStatusOpen(true)}
         onOpenPriceListScanner={() => setIsPriceListScannerOpen(true)}
+        onOpenBeverageAudit={() => setIsBeverageAuditOpen(true)}
         dbConnected={isDbConnected}
       />
 
@@ -687,6 +690,15 @@ export default function HomePage() {
       <PriceListScannerModal
         isOpen={isPriceListScannerOpen}
         onClose={() => setIsPriceListScannerOpen(false)}
+        products={products}
+        currentUser={currentUser}
+        onSuccess={fetchData}
+      />
+
+      {/* Modal de Auditoría IA de Bebidas (Nombres Técnicos y Costos de Fábrica) */}
+      <BeverageAuditModal
+        isOpen={isBeverageAuditOpen}
+        onClose={() => setIsBeverageAuditOpen(false)}
         products={products}
         currentUser={currentUser}
         onSuccess={fetchData}
