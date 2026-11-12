@@ -218,8 +218,8 @@ export function Navbar({
               </button>
             )}
 
-            {/* BOTÓN INVENTARIO DE PROTEÍNAS Y PORCIONES: ADMIN, EMPLEADO O COCINA */}
-            {(isAdmin || isEmpleado || isCocina) && onOpenProteins && (
+            {/* BOTÓN INVENTARIO DE PROTEÍNAS Y PORCIONES: SOLO COCINA (Admin/Empleado lo ven dentro de Bodega & Bebidas) */}
+            {isCocina && onOpenProteins && (
               <button
                 onClick={onOpenProteins}
                 className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] sm:text-xs flex items-center gap-1.5 border border-rose-200 transition-all active:scale-95 whitespace-nowrap"
