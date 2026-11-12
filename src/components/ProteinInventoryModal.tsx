@@ -19,9 +19,10 @@ import {
 } from 'lucide-react';
 
 interface ProteinInventoryModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   currentUser: Omit<User, 'pin'> | null;
+  embedded?: boolean;
 }
 
 const PROTEIN_CATEGORIES = ['Res', 'Pollo', 'Cerdo', 'Pescado y Mariscos', 'Embutidos', 'Otros'];
@@ -31,9 +32,10 @@ function todayDateStr() {
 }
 
 export function ProteinInventoryModal({
-  isOpen,
+  isOpen = true,
   onClose,
-  currentUser
+  currentUser,
+  embedded = false
 }: ProteinInventoryModalProps) {
   const [tab, setTab] = useState<'LIST' | 'FORM' | 'BATCH' | 'HISTORY'>('LIST');
   const [proteins, setProteins] = useState<ProteinPortion[]>([]);
@@ -84,11 +86,11 @@ export function ProteinInventoryModal({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (embedded || isOpen) {
       setTab('LIST');
       fetchProteins();
     }
-  }, [isOpen]);
+  }, [isOpen, embedded]);
 
   const totals = useMemo(() => {
     const totalPortions = proteins.reduce((acc, p) => acc + p.portionsStock, 0);
@@ -109,7 +111,7 @@ export function ProteinInventoryModal({
     return proteins.filter(p => p.category === filterCat);
   }, [proteins, filterCat]);
 
-  if (!isOpen) return null;
+  if (!embedded && !isOpen) return null;
 
   const isAdmin = currentUser?.role === 'ADMIN';
 
@@ -268,31 +270,38 @@ export function ProteinInventoryModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/65 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
-        {/* Cabecera */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-gradient-to-r from-rose-50/80 to-amber-50/70">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-md shadow-rose-600/20">
-              <Utensils className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-extrabold text-slate-900">
-                Inventario de Proteínas y Porciones
-              </h2>
-              <p className="text-xs text-slate-600">
-                Control por porción, peso en gramos, costos, precios y fechas de ingreso
-              </p>
-            </div>
+  const content = (
+    <div
+      className={
+        embedded
+          ? 'bg-white w-full rounded-3xl shadow-xs border border-slate-200/80 overflow-hidden flex flex-col'
+          : 'bg-white w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col'
+      }
+    >
+      {/* Cabecera */}
+      <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-gradient-to-r from-rose-50/80 to-amber-50/70">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-md shadow-rose-600/20">
+            <Utensils className="w-5 h-5" />
           </div>
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-900">
+              Inventario de Proteínas y Porciones
+            </h2>
+            <p className="text-xs text-slate-600">
+              Control por porción, peso en gramos, costos, precios y fechas de ingreso
+            </p>
+          </div>
+        </div>
+        {!embedded && onClose && (
           <button
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-200/50 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
+        )}
+      </div>
 
         {/* Pestañas */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
@@ -898,7 +907,14 @@ export function ProteinInventoryModal({
             </div>
           )}
         </div>
-      </div>
+    </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/65 backdrop-blur-sm overflow-y-auto">
+      {content}
     </div>
   );
 }

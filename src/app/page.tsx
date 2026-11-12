@@ -58,6 +58,7 @@ export default function HomePage() {
   const [isPriceListScannerOpen, setIsPriceListScannerOpen] = useState(false);
   const [isBeverageAuditOpen, setIsBeverageAuditOpen] = useState(false);
   const [isProteinsOpen, setIsProteinsOpen] = useState(false);
+  const [inventorySubTab, setInventorySubTab] = useState<'BEVERAGES' | 'PROTEINS'>('BEVERAGES');
   const [productToAdjust, setProductToAdjust] = useState<Product | null>(null);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
@@ -432,7 +433,14 @@ export default function HomePage() {
         onOpenDbStatus={() => setIsDbStatusOpen(true)}
         onOpenPriceListScanner={() => setIsPriceListScannerOpen(true)}
         onOpenBeverageAudit={() => setIsBeverageAuditOpen(true)}
-        onOpenProteins={() => setIsProteinsOpen(true)}
+        onOpenProteins={() => {
+          if (currentUser?.role === 'COCINA') {
+            setIsProteinsOpen(true);
+          } else {
+            setCurrentView('INVENTORY');
+            setInventorySubTab('PROTEINS');
+          }
+        }}
         dbConnected={isDbConnected}
       />
 
@@ -544,6 +552,38 @@ export default function HomePage() {
         {/* MÓDULO 4: BODEGA & BEBIDAS (INVENTARIO) */}
         {effectiveView === 'INVENTORY' && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-fade-in">
+            {/* Sub-secciones dentro de Bodega / Inventario */}
+            <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs w-fit">
+              <button
+                type="button"
+                onClick={() => setInventorySubTab('BEVERAGES')}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                  inventorySubTab === 'BEVERAGES'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <span>🥤</span>
+                <span>Bebidas y Bodega</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInventorySubTab('PROTEINS')}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                  inventorySubTab === 'PROTEINS'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <span>🥩</span>
+                <span>Proteínas y Porciones</span>
+              </button>
+            </div>
+
+            {inventorySubTab === 'PROTEINS' ? (
+              <ProteinInventoryModal embedded currentUser={currentUser} />
+            ) : (
+              <>
             {/* Banner de bienvenida y métricas de bodega */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs flex items-center gap-3">
@@ -644,6 +684,8 @@ export default function HomePage() {
                   />
                 ))}
               </div>
+            )}
+              </>
             )}
           </main>
         )}
