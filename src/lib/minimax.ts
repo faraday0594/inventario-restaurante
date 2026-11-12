@@ -358,6 +358,7 @@ export interface BeverageAuditInput {
 export interface BeverageAuditSuggestion {
   productId: string;
   suggestedName: string;
+  suggestedCategory: string;
   suggestedPresentation: string;
   suggestedCostPrice: number;
   suggestedAliases: string[];
@@ -393,17 +394,24 @@ Eres un auditor experto en compras, costos y catálogos de bebidas para restaura
 Recibirás una lista de productos de bebidas actualmente en bodega.
 
 Tu tarea para CADA producto es:
-1. Generar un "suggestedName": nombre técnico y comercial estandarizado (marca + variedad + volumen exacto).
+1. Generar un "suggestedName": nombre técnico y comercial estandarizado en español correcto (con tildes y ñ cuando aplique, ej. "Bretaña"), incluyendo marca + variedad + volumen exacto + tipo de envase si evita ambigüedad (ej: "Pony Malta Lata 330ml" vs "Pony Malta PET 330ml").
    Ejemplos:
    - "coca grande" -> "Coca-Cola Original 1.5L"
    - "aguila light" -> "Cerveza Águila Light 330ml"
    - "agua cristal" -> "Agua Cristal Sin Gas 600ml"
-2. Generar "suggestedPresentation": presentación técnica clara (ej: "Botella PET 400ml", "Botella Vidrio 350ml", "Lata 330ml", "Botella PET 1.5L").
-3. Estimar "suggestedCostPrice": costo unitario aproximado de fábrica / distribuidor mayorista en Colombia en pesos colombianos (COP, número entero).
+   - "Bretaña 300 ml" -> "Bretaña 300ml"
+2. Generar "suggestedCategory": clasifica en la categoría correcta entre:
+   "Gaseosas", "Aguas", "Cervezas", "Té y Jugos", "Energizantes", "Licores", "Otros".
+   - Aguas naturales/con gas/saborizadas (Brisa, Cristal, Manantial, H2O) -> "Aguas"
+   - Energizantes (Red Bull, Vive 100, Speed Max, Monster) -> "Energizantes"
+   - Tés, jugos, aloe (Mr Tea, Hatsu, Hit, Saviloe) -> "Té y Jugos"
+   - Maltas y gaseosas (Coca-Cola, Postobón, Sprite, Quatro, Pony Malta, Natu Malta, Bretaña, Ginger Ale, Canada Dry) -> "Gaseosas"
+3. Generar "suggestedPresentation": presentación técnica exacta del envase (ej: "Botella PET 400ml", "Botella Vidrio 350ml", "Lata 330ml", "Bolsa 360ml", "Botella PET 1.5L"). Corrige si el nombre dice 500ml y la presentación decía 400ml, o si dice lata/vidrio/bolsa.
+4. Estimar "suggestedCostPrice": costo unitario aproximado de fábrica / distribuidor mayorista en Colombia en pesos colombianos (COP, número entero).
    - Toma en cuenta el mercado colombiano actual (Coca-Cola FEMSA, Postobón, Bavaria, etc.) y como referencia secundaria que el precio de venta del restaurante suele estar por encima del costo.
    - Si no estás seguro de un producto poco común, usa una estimación prudente sin inventar cifras absurdas.
-4. Generar "suggestedAliases": 2 a 3 alias cortos como suelen aparecer en facturas de proveedores (ej: ["CC PET 400", "COCA COLA 400ML"]).
-5. Incluir "reason": explicación muy breve (máximo 12 palabras) del ajuste sugerido.
+5. Generar "suggestedAliases": 2 a 3 alias cortos como suelen aparecer en facturas de proveedores (ej: ["CC PET 400", "COCA COLA 400ML"]).
+6. Incluir "reason": explicación muy breve (máximo 12 palabras) del ajuste sugerido.
 
 REGLA ESTRICTA:
 - Devuelve exactamente el "productId" de entrada para cada producto.
@@ -414,10 +422,11 @@ REGLA ESTRICTA:
     {
       "productId": "id_exacto",
       "suggestedName": "Nombre Técnico Estándar",
+      "suggestedCategory": "Gaseosas",
       "suggestedPresentation": "Botella PET 400ml",
       "suggestedCostPrice": 2200,
       "suggestedAliases": ["ALIAS 1", "ALIAS 2"],
-      "reason": "Nombre estandarizado y costo mayorista de referencia"
+      "reason": "Nombre, categoría, envase y costo mayorista actualizados"
     }
   ]
 }
@@ -475,6 +484,7 @@ REGLA ESTRICTA:
           allSuggestions.push({
             productId: String(s.productId),
             suggestedName: String(s.suggestedName || '').trim(),
+            suggestedCategory: String(s.suggestedCategory || '').trim(),
             suggestedPresentation: String(s.suggestedPresentation || '').trim(),
             suggestedCostPrice: Math.max(0, Math.round(Number(s.suggestedCostPrice) || 0)),
             suggestedAliases: Array.isArray(s.suggestedAliases)

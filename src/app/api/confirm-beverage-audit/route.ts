@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 interface AuditConfirmItem {
   productId: string;
   suggestedName: string;
+  suggestedCategory?: string;
   suggestedPresentation: string;
   suggestedCostPrice: number;
   suggestedAliases?: string[];
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
         {
           ...existing,
           name: item.suggestedName?.trim() || existing.name,
+          category: item.suggestedCategory?.trim() || existing.category,
           presentation: item.suggestedPresentation?.trim() || existing.presentation,
           costPrice:
             typeof item.suggestedCostPrice === 'number' && item.suggestedCostPrice >= 0

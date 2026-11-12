@@ -50,6 +50,7 @@ export async function POST(request: Request) {
         fridgeStock: p.fridgeStock || 0,
         salePrice: p.salePrice,
         suggestedName: sug?.suggestedName || p.name,
+        suggestedCategory: sug?.suggestedCategory || p.category,
         suggestedPresentation: sug?.suggestedPresentation || p.presentation,
         suggestedCostPrice:
           typeof sug?.suggestedCostPrice === 'number' && sug.suggestedCostPrice > 0

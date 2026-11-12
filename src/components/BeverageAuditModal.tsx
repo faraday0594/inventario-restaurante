@@ -32,6 +32,7 @@ interface AuditRow {
   fridgeStock: number;
   salePrice: number;
   suggestedName: string;
+  suggestedCategory: string;
   suggestedPresentation: string;
   costInput: string;
   suggestedAliases: string[];
@@ -39,6 +40,7 @@ interface AuditRow {
   selected: boolean;
 }
 
+const CATEGORIES = ['Gaseosas', 'Aguas', 'Cervezas', 'Té y Jugos', 'Energizantes', 'Licores', 'Otros'];
 const NON_BEVERAGE_CATEGORIES = ['Snacks y Golosinas', 'Comidas y Platos'];
 
 export function BeverageAuditModal({
@@ -92,6 +94,7 @@ export function BeverageAuditModal({
         fridgeStock: item.fridgeStock || 0,
         salePrice: item.salePrice,
         suggestedName: item.suggestedName,
+        suggestedCategory: item.suggestedCategory || item.category,
         suggestedPresentation: item.suggestedPresentation,
         costInput: String(item.suggestedCostPrice ?? item.currentCostPrice ?? 0),
         suggestedAliases: item.suggestedAliases || [],
@@ -141,6 +144,7 @@ export function BeverageAuditModal({
         .map(r => ({
           productId: r.productId,
           suggestedName: r.suggestedName.trim() || r.currentName,
+          suggestedCategory: r.suggestedCategory || r.category,
           suggestedPresentation: r.suggestedPresentation.trim() || r.currentPresentation,
           suggestedCostPrice: Math.max(0, parseInt(r.costInput, 10) || 0),
           suggestedAliases: r.suggestedAliases,
@@ -337,7 +341,7 @@ export function BeverageAuditModal({
                         </div>
 
                         {/* Campos editables sugeridos */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                           <div>
                             <label className="block text-[10px] font-bold uppercase text-indigo-700 mb-1">
                               Nombre Técnico Sugerido
@@ -355,7 +359,25 @@ export function BeverageAuditModal({
 
                           <div>
                             <label className="block text-[10px] font-bold uppercase text-indigo-700 mb-1">
-                              Presentación
+                              Categoría (Actual: {row.category})
+                            </label>
+                            <select
+                              value={row.suggestedCategory}
+                              disabled={!row.selected || step === 'SAVING'}
+                              onChange={e =>
+                                handleRowChange(idx, 'suggestedCategory', e.target.value)
+                              }
+                              className="w-full px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            >
+                              {Array.from(new Set([...CATEGORIES, row.suggestedCategory])).map(c => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-indigo-700 mb-1">
+                              Presentación / Envase
                             </label>
                             <input
                               type="text"
