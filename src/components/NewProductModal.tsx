@@ -25,42 +25,59 @@ export function NewProductModal({
   onDelete,
   onOpenPriceListScanner
 }: NewProductModalProps) {
-  if (!isOpen) return null;
-
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Gaseosas');
   const [presentation, setPresentation] = useState('Botella PET 400ml');
-  const [stock, setStock] = useState<number>(0);
-  const [minStock, setMinStock] = useState<number>(12);
-  const [costPrice, setCostPrice] = useState<number>(2500);
-  const [salePrice, setSalePrice] = useState<number>(5000);
+  const [stock, setStock] = useState<string>('0');
+  const [minStock, setMinStock] = useState<string>('12');
+  const [costPrice, setCostPrice] = useState<string>('2500');
+  const [salePrice, setSalePrice] = useState<string>('5000');
   const [barcode, setBarcode] = useState('');
   const [aliases, setAliases] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (productToEdit) {
       setName(productToEdit.name);
       setCategory(productToEdit.category);
       setPresentation(productToEdit.presentation);
-      setStock(productToEdit.stock);
-      setMinStock(productToEdit.minStock);
-      setCostPrice(productToEdit.costPrice);
-      setSalePrice(productToEdit.salePrice);
+      setStock(String(productToEdit.stock ?? 0));
+      setMinStock(String(productToEdit.minStock ?? 12));
+      setCostPrice(String(productToEdit.costPrice ?? 0));
+      setSalePrice(String(productToEdit.salePrice ?? 0));
       setBarcode(productToEdit.barcode || '');
       setAliases((productToEdit.aliases || []).join(', '));
     } else {
       setName('');
       setCategory('Gaseosas');
       setPresentation('Botella PET 400ml');
-      setStock(0);
-      setMinStock(12);
-      setCostPrice(2500);
-      setSalePrice(5000);
+      setStock('0');
+      setMinStock('12');
+      setCostPrice('2500');
+      setSalePrice('5000');
       setBarcode('');
       setAliases('');
     }
-  }, [productToEdit]);
+  }, [productToEdit, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleNumericChange = (setter: React.Dispatch<React.SetStateAction<string>>) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const raw = e.target.value;
+    if (raw === '') {
+      setter('');
+      return;
+    }
+    const digitsOnly = raw.replace(/\D/g, '');
+    if (digitsOnly === '') {
+      setter('');
+      return;
+    }
+    setter(digitsOnly.replace(/^0+(\d)/, '$1'));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,10 +95,10 @@ export function NewProductModal({
         name: name.trim(),
         category,
         presentation: presentation.trim(),
-        stock: Number(stock) || 0,
-        minStock: Number(minStock) || 0,
-        costPrice: Number(costPrice) || 0,
-        salePrice: Number(salePrice) || 0,
+        stock: Math.max(0, parseInt(stock, 10) || 0),
+        minStock: Math.max(1, parseInt(minStock, 10) || 1),
+        costPrice: Math.max(0, parseInt(costPrice, 10) || 0),
+        salePrice: Math.max(0, parseInt(salePrice, 10) || 0),
         barcode: barcode.trim() || undefined,
         aliases: aliasArray
       });
@@ -215,9 +232,11 @@ export function NewProductModal({
               <input
                 type="number"
                 min="0"
+                step="1"
+                placeholder="0"
                 value={stock}
                 disabled={Boolean(productToEdit && currentUser?.role !== 'ADMIN')}
-                onChange={(e) => setStock(Math.max(0, parseInt(e.target.value) || 0))}
+                onChange={handleNumericChange(setStock)}
                 className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
@@ -229,8 +248,10 @@ export function NewProductModal({
               <input
                 type="number"
                 min="1"
+                step="1"
+                placeholder="12"
                 value={minStock}
-                onChange={(e) => setMinStock(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={handleNumericChange(setMinStock)}
                 className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold text-amber-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -245,9 +266,10 @@ export function NewProductModal({
               <input
                 type="number"
                 min="0"
-                step="50"
+                step="1"
+                placeholder="2500"
                 value={costPrice}
-                onChange={(e) => setCostPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                onChange={handleNumericChange(setCostPrice)}
                 className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -259,9 +281,10 @@ export function NewProductModal({
               <input
                 type="number"
                 min="0"
-                step="100"
+                step="1"
+                placeholder="5000"
                 value={salePrice}
-                onChange={(e) => setSalePrice(Math.max(0, parseInt(e.target.value) || 0))}
+                onChange={handleNumericChange(setSalePrice)}
                 className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
