@@ -1,7 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
-import { Product, Movement, MovementType, User, UserRole, MenuItem, Order, OrderItem, OrderStatus, OrderType } from './types';
+import {
+  Product, Movement, MovementType, User, UserRole, MenuItem, Order, OrderItem, OrderStatus, OrderType,
+  ProteinPortion, ProteinMovement, ProteinMovementType
+} from './types';
 
 // En entornos serverless como Vercel o AWS Lambda, solo /tmp es escribible
 const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -15,6 +18,8 @@ export interface InventoryData {
   users: User[];
   menuItems: MenuItem[];
   orders: Order[];
+  proteins?: ProteinPortion[];
+  proteinMovements?: ProteinMovement[];
 }
 
 export const INITIAL_MENU_ITEMS: MenuItem[] = [
@@ -254,6 +259,8 @@ function normalizeData(data: InventoryData): InventoryData {
     data.menuItems = [...INITIAL_MENU_ITEMS];
   }
   if (!data.orders || !Array.isArray(data.orders)) data.orders = [];
+  if (!data.proteins || !Array.isArray(data.proteins)) data.proteins = [];
+  if (!data.proteinMovements || !Array.isArray(data.proteinMovements)) data.proteinMovements = [];
   return data;
 }
 
@@ -1203,3 +1210,203 @@ export async function checkDbStatus(): Promise<DbStatusInfo> {
   }
 }
 
+
+// ==========================================
+// INVENTARIO DE PROTEÍNAS Y PORCIONES
+// ==========================================
+
+export async function getAllProteins(): Promise<{
+  proteins: ProteinPortion[];
+  movements: ProteinMovement[];
+}> {
+  const data = await ensureData();
+  return {
+    proteins: data.proteins || [],
+    movements: data.proteinMovements || []
+  };
+}
+
+export async function saveProtein(
+  proteinData: Omit<ProteinPortion, 'id' | 'updatedAt'> & { id?: string; entryDate?: string },
+  user?: { id: string; name: string; role: UserRole }
+): Promise<ProteinPortion> {
+  const data = await ensureData();
+  if (!data.proteins) data.proteins = [];
+  if (!data.proteinMovements) data.proteinMovements = [];
+
+  const now = new Date().toISOString();
+  const entryDate = proteinData.entryDate || now.split('T')[0];
+
+  if (proteinData.id) {
+    const idx = data.proteins.findIndex(p => p.id === proteinData.id);
+    if (idx !== -1) {
+      const existing = data.proteins[idx];
+      const updated: ProteinPortion = {
+        ...existing,
+        name: proteinData.name.trim(),
+        category: proteinData.category,
+        portionWeightGrams: Math.max(1, Number(proteinData.portionWeightGrams) || existing.portionWeightGrams),
+        portionsStock: Math.max(0, Number(proteinData.portionsStock) ?? existing.portionsStock),
+        minPortions: Math.max(0, Number(proteinData.minPortions) ?? existing.minPortions),
+        costPerPortion: Math.max(0, Number(proteinData.costPerPortion) ?? existing.costPerPortion),
+        salePrice: Math.max(0, Number(proteinData.salePrice) ?? existing.salePrice),
+        notes: proteinData.notes?.trim() || undefined,
+        lastEntryAt: existing.lastEntryAt,
+        updatedAt: now
+      };
+      data.proteins[idx] = updated;
+      await saveData(data);
+      return updated;
+    }
+  }
+
+  const initialStock = Math.max(0, Number(proteinData.portionsStock) || 0);
+  const weight = Math.max(1, Number(proteinData.portionWeightGrams) || 200);
+  const cost = Math.max(0, Number(proteinData.costPerPortion) || 0);
+  const sale = Math.max(0, Number(proteinData.salePrice) || 0);
+
+  const newProtein: ProteinPortion = {
+    id: `prot-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    name: proteinData.name.trim(),
+    category: proteinData.category || 'Res',
+    portionWeightGrams: weight,
+    portionsStock: initialStock,
+    minPortions: Math.max(0, Number(proteinData.minPortions) || 10),
+    costPerPortion: cost,
+    salePrice: sale,
+    notes: proteinData.notes?.trim() || undefined,
+    lastEntryAt: initialStock > 0 ? entryDate : undefined,
+    updatedAt: now
+  };
+
+  data.proteins.push(newProtein);
+
+  if (initialStock > 0) {
+    const movement: ProteinMovement = {
+      id: `pmov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      proteinId: newProtein.id,
+      proteinName: newProtein.name,
+      type: 'ENTRADA',
+      portionsDelta: initialStock,
+      portionWeightGrams: weight,
+      totalWeightGrams: initialStock * weight,
+      costPerPortion: cost,
+      salePrice: sale,
+      previousStock: 0,
+      newStock: initialStock,
+      reason: proteinData.notes?.trim() || 'Registro inicial de porciones',
+      entryDate,
+      userId: user?.id,
+      userName: user?.name || 'Sistema',
+      userRole: user?.role,
+      createdAt: now
+    };
+    data.proteinMovements.unshift(movement);
+  }
+
+  await saveData(data);
+  return newProtein;
+}
+
+export async function adjustProteinPortions(
+  params: {
+    proteinId: string;
+    delta: number;
+    type?: ProteinMovementType;
+    reason?: string;
+    entryDate?: string;
+    portionWeightGrams?: number;
+    costPerPortion?: number;
+    salePrice?: number;
+  },
+  user?: { id: string; name: string; role: UserRole }
+): Promise<{ protein: ProteinPortion; movement: ProteinMovement }> {
+  const data = await ensureData();
+  if (!data.proteins) data.proteins = [];
+  if (!data.proteinMovements) data.proteinMovements = [];
+
+  const idx = data.proteins.findIndex(p => p.id === params.proteinId);
+  if (idx === -1) {
+    throw new Error('Proteína no encontrada en inventario.');
+  }
+
+  const existing = data.proteins[idx];
+  const now = new Date().toISOString();
+  const entryDate = params.entryDate || now.split('T')[0];
+  const previousStock = existing.portionsStock;
+  const newStock = Math.max(0, previousStock + params.delta);
+
+  const weight =
+    typeof params.portionWeightGrams === 'number' && params.portionWeightGrams > 0
+      ? params.portionWeightGrams
+      : existing.portionWeightGrams;
+  const cost =
+    typeof params.costPerPortion === 'number' && params.costPerPortion >= 0
+      ? params.costPerPortion
+      : existing.costPerPortion;
+  const sale =
+    typeof params.salePrice === 'number' && params.salePrice >= 0
+      ? params.salePrice
+      : existing.salePrice;
+
+  const movementType: ProteinMovementType =
+    params.type || (params.delta >= 0 ? 'ENTRADA' : 'SALIDA');
+
+  const updated: ProteinPortion = {
+    ...existing,
+    portionWeightGrams: weight,
+    costPerPortion: cost,
+    salePrice: sale,
+    portionsStock: newStock,
+    lastEntryAt: movementType === 'ENTRADA' && params.delta > 0 ? entryDate : existing.lastEntryAt,
+    updatedAt: now
+  };
+
+  data.proteins[idx] = updated;
+
+  const movement: ProteinMovement = {
+    id: `pmov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    proteinId: updated.id,
+    proteinName: updated.name,
+    type: movementType,
+    portionsDelta: params.delta,
+    portionWeightGrams: weight,
+    totalWeightGrams: Math.abs(params.delta) * weight,
+    costPerPortion: cost,
+    salePrice: sale,
+    previousStock,
+    newStock,
+    reason:
+      params.reason?.trim() ||
+      (movementType === 'ENTRADA' ? 'Ingreso de porciones' : 'Consumo / salida de cocina'),
+    entryDate,
+    userId: user?.id,
+    userName: user?.name || 'Sistema',
+    userRole: user?.role,
+    createdAt: now
+  };
+
+  data.proteinMovements.unshift(movement);
+  if (data.proteinMovements.length > 500) {
+    data.proteinMovements = data.proteinMovements.slice(0, 500);
+  }
+
+  await saveData(data);
+  return { protein: updated, movement };
+}
+
+export async function deleteProtein(
+  id: string,
+  user?: { role: UserRole }
+): Promise<boolean> {
+  if (!user || user.role !== 'ADMIN') {
+    throw new Error('Solo el Administrador puede eliminar proteínas del inventario.');
+  }
+  const data = await ensureData();
+  if (!data.proteins) return false;
+  const initialLen = data.proteins.length;
+  data.proteins = data.proteins.filter(p => p.id !== id);
+  if (data.proteins.length === initialLen) return false;
+  await saveData(data);
+  return true;
+}

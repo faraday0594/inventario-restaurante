@@ -131,3 +131,39 @@ export interface PriceListScanResult {
   items: PriceListExtractedItem[];
 }
 
+
+export interface ProteinPortion {
+  id: string;
+  name: string;
+  category: string;
+  portionWeightGrams: number;
+  portionsStock: number;
+  minPortions: number;
+  costPerPortion: number;
+  salePrice: number;
+  notes?: string;
+  lastEntryAt?: string;
+  updatedAt: string;
+}
+
+export type ProteinMovementType = 'ENTRADA' | 'SALIDA' | 'MERMA' | 'AJUSTE';
+
+export interface ProteinMovement {
+  id: string;
+  proteinId: string;
+  proteinName: string;
+  type: ProteinMovementType;
+  portionsDelta: number;
+  portionWeightGrams: number;
+  totalWeightGrams: number;
+  costPerPortion: number;
+  salePrice: number;
+  previousStock: number;
+  newStock: number;
+  reason: string;
+  entryDate: string;
+  userId?: string;
+  userName?: string;
+  userRole?: UserRole;
+  createdAt: string;
+}

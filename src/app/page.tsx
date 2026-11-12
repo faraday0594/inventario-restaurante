@@ -20,6 +20,7 @@ import { DbStatusModal } from '@/components/DbStatusModal';
 import { FridgeTransferModal } from '@/components/FridgeTransferModal';
 import { PriceListScannerModal } from '@/components/PriceListScannerModal';
 import { BeverageAuditModal } from '@/components/BeverageAuditModal';
+import { ProteinInventoryModal } from '@/components/ProteinInventoryModal';
 import { 
   Package, AlertTriangle, DollarSign, Boxes, Sparkles, RefreshCw, Layers, ShieldAlert,
   Bell, X, Flame
@@ -56,6 +57,7 @@ export default function HomePage() {
   const [productForFridge, setProductForFridge] = useState<Product | null>(null);
   const [isPriceListScannerOpen, setIsPriceListScannerOpen] = useState(false);
   const [isBeverageAuditOpen, setIsBeverageAuditOpen] = useState(false);
+  const [isProteinsOpen, setIsProteinsOpen] = useState(false);
   const [productToAdjust, setProductToAdjust] = useState<Product | null>(null);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
@@ -430,6 +432,7 @@ export default function HomePage() {
         onOpenDbStatus={() => setIsDbStatusOpen(true)}
         onOpenPriceListScanner={() => setIsPriceListScannerOpen(true)}
         onOpenBeverageAudit={() => setIsBeverageAuditOpen(true)}
+        onOpenProteins={() => setIsProteinsOpen(true)}
         dbConnected={isDbConnected}
       />
 
@@ -702,6 +705,13 @@ export default function HomePage() {
         products={products}
         currentUser={currentUser}
         onSuccess={fetchData}
+      />
+
+      {/* Modal de Inventario de Proteínas y Porciones */}
+      <ProteinInventoryModal
+        isOpen={isProteinsOpen}
+        onClose={() => setIsProteinsOpen(false)}
+        currentUser={currentUser}
       />
 
       {currentUser?.role === 'ADMIN' && (

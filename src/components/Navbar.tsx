@@ -28,6 +28,7 @@ interface NavbarProps {
   onOpenDbStatus?: () => void;
   onOpenPriceListScanner?: () => void;
   onOpenBeverageAudit?: () => void;
+  onOpenProteins?: () => void;
   dbConnected?: boolean;
 }
 
@@ -50,6 +51,7 @@ export function Navbar({
   onOpenDbStatus,
   onOpenPriceListScanner,
   onOpenBeverageAudit,
+  onOpenProteins,
   dbConnected
 }: NavbarProps) {
   const isAdmin = currentUser?.role === 'ADMIN';
@@ -152,6 +154,18 @@ export function Navbar({
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden md:inline">Nueva Bebida</span>
+              </button>
+            )}
+
+            {/* BOTÓN INVENTARIO DE PROTEÍNAS Y PORCIONES: ADMIN, EMPLEADO O COCINA */}
+            {(isAdmin || isEmpleado || isCocina) && onOpenProteins && (
+              <button
+                onClick={onOpenProteins}
+                className="px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1.5 border border-rose-200 transition-all active:scale-95"
+                title="Inventario de porciones de proteína (pesos, precios y fechas de ingreso)"
+              >
+                <span>🥩</span>
+                <span className="hidden sm:inline">Proteínas</span>
               </button>
             )}
 
